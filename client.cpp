@@ -10,8 +10,8 @@ int main() {
     struct sockaddr_in serv_addr;
     bzero(&serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    serv_addr.sin_port = htons(8080);
+    serv_addr.sin_addr.s_addr = inet_addr(ADDRESS);
+    serv_addr.sin_port = htons(PORT);
     errif(connect(sockfd, (sockaddr*)&serv_addr, sizeof(serv_addr)) == -1, "connect socket error");
     while (true) {
         char buf[1024];
