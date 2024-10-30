@@ -1,7 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <string.h>
+#include <iostream>
+#include <fcntl.h>
+#include <sys/epoll.h>
+#include <netinet/in.h>
+#include <errno.h>
+#include <vector>
 using namespace std;
 
 #define PORT 8081

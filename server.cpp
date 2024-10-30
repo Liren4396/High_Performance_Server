@@ -1,16 +1,5 @@
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <string.h>
-#include <iostream>
-#include <fcntl.h>
-#include <sys/epoll.h>
-#include <netinet/in.h>
-#include <errno.h>
-
-#include "util.h"
-
-#define SOMAXCONN 128
-#define MAX_EVENTS 1024
+#include "socket.h"
+#include "Epoll.h"
 
 void handleEvent(int sockfd) {
     while (true) {
@@ -40,44 +29,34 @@ void setnonblocking(int fd) {
 }
 
 int main() {
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    errif(sockfd == -1, "create sockfd error");
 
-    struct sockaddr_in serv_addr;
-    bzero(&serv_addr, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr(ADDRESS);
-    serv_addr.sin_port = htons(PORT);
-    errif(bind(sockfd, (sockaddr*)&serv_addr, sizeof(serv_addr)) == -1, "socket bind error");
+    Socket* svr = new Socket();
+    InetAddress* addr = new InetAddress();
+    svr->sbind(addr);
+    svr->slisten();
 
-    errif(listen(sockfd, SOMAXCONN) == -1, "socket listen error");
+    Epoll* epoll = new Epoll();
+    epoll->add(EPOLLIN, svr->getFd());
 
-
-    int epfd = epoll_create1(0);
-    struct epoll_event events[MAX_EVENTS], ev;
-    ev.events = EPOLLIN;
-    ev.data.fd = sockfd;
-    epoll_ctl(epfd, EPOLL_CTL_ADD, sockfd, &ev);
     while (true) {
-        int nfds = epoll_wait(epfd, events, MAX_EVENTS, -1);
+        vector<epoll_event> events = epoll->poll();
+        int nfds= events.size();
         for (int i = 0; i < nfds; ++i) {
-            if (events[i].data.fd == sockfd) { // 发生事件是服务器的fd，表示新客户端连接
-                struct sockaddr_in client_addr;
-                socklen_t client_addr_len = sizeof(client_addr);
-                bzero(&client_addr, sizeof(client_addr));
-                int client_sockfd = accept(sockfd, (sockaddr*)&client_addr, &client_addr_len);
-                errif(client_sockfd == -1, "accept socket error");
-                ev.data.fd = client_sockfd;
-                ev.events = EPOLLIN | EPOLLET;
-                setnonblocking(client_sockfd);
-                epoll_ctl(epfd, EPOLL_CTL_ADD, client_sockfd, &ev); 
-                printf("new client fd %d! IP: %s Port: %d\n", client_sockfd, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+            if (events[i].data.fd == svr->getFd()) {            // 发生事件是服务器的fd，表示新客户端连接
+                InetAddress* client_addr = new InetAddress();   // 会有内存泄漏, 并且无法delete
+                int cliFd = svr->saccept(client_addr);          // 会有内存泄漏, 并且无法delete
+                Socket* cli = new Socket(cliFd); 
+                
+                cli->setnonblocking();
+                epoll->add(EPOLLIN | EPOLLET, cli->getFd());
+                printf("new client fd %d! IP: %s Port: %d\n", cli->getFd(), inet_ntoa(client_addr->getSockAddress().sin_addr), ntohs(client_addr->getSockAddress().sin_port));
             } else if (events[i].events & EPOLLIN) {
                 handleEvent(events[i].data.fd);
             } else {
                 cout << "something else happen" << endl;
             }
-        } 
-
+        }
     }
+    delete svr;
+    delete addr;
 }
