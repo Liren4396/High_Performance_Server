@@ -1,5 +1,13 @@
-#include "socket.h"
+#include <iostream>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <vector>
 #include "Epoll.h"
+#include "InetAddress.h"
+#include "Socket.h"
+#include "Channel.h"
 
 void handleEvent(int sockfd) {
     while (true) {
@@ -7,16 +15,16 @@ void handleEvent(int sockfd) {
         bzero(&buf, sizeof(buf));
         ssize_t read_bytes = read(sockfd, buf, sizeof(buf));
         if (read_bytes > 0) {
-            cout << "message from client" << sockfd << ": " << buf << endl;
+            std::cout << "message from client" << sockfd << ": " << buf << std::endl;
             write(sockfd, buf, sizeof(buf));
         } else if (read_bytes == -1 && errno == EINTR) {
-            cout << "continue reading" << endl;
+            std::cout << "continue reading" << std::endl;
             break;
         } else if (read_bytes == -1 && ((errno == EAGAIN) || (errno == EWOULDBLOCK))) {
-            cout << "finish reading once, errno: " << errno << endl;
+            std::cout << "finish reading once, errno: " << errno << std::endl;
             break;
         } else if (read_bytes == 0) {
-            cout << "client" << sockfd << " disconnected" << endl;
+            std::cout << "client" << sockfd << " disconnected" << std::endl;
             close(sockfd);
             break;
         }
@@ -36,24 +44,27 @@ int main() {
     svr->slisten();
 
     Epoll* epoll = new Epoll();
-    epoll->add(EPOLLIN, svr->getFd());
+
+    Channel* svrChannel = new Channel(epoll, svr->getFd());
+    svrChannel->enableReading();
 
     while (true) {
-        vector<epoll_event> events = epoll->poll();
+        std::vector<Channel*> events = epoll->poll();
         int nfds= events.size();
         for (int i = 0; i < nfds; ++i) {
-            if (events[i].data.fd == svr->getFd()) {            // 发生事件是服务器的fd，表示新客户端连接
+            if (events[i]->getFd() == svr->getFd()) {            // 发生事件是服务器的fd，表示新客户端连接
                 InetAddress* client_addr = new InetAddress();   // 会有内存泄漏, 并且无法delete
                 int cliFd = svr->saccept(client_addr);          // 会有内存泄漏, 并且无法delete
                 Socket* cli = new Socket(cliFd); 
                 
                 cli->setnonblocking();
-                epoll->add(EPOLLIN | EPOLLET, cli->getFd());
+                Channel* cliChannel = new Channel(epoll, cliFd);
+                cliChannel->enableReading();
                 printf("new client fd %d! IP: %s Port: %d\n", cli->getFd(), inet_ntoa(client_addr->getSockAddress().sin_addr), ntohs(client_addr->getSockAddress().sin_port));
-            } else if (events[i].events & EPOLLIN) {
-                handleEvent(events[i].data.fd);
+            } else if (events[i]->getRevents() & EPOLLIN) {
+                handleEvent(events[i]->getFd());
             } else {
-                cout << "something else happen" << endl;
+                std::cout << "something else happen" << std::endl;
             }
         }
     }
