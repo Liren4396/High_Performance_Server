@@ -3,9 +3,9 @@ CFLAGS = -o
 
 All: client server
 
-client: client.cpp Util.cpp
+client: client.cpp src/Util.cpp
 	$(CC) $(CFLAGS) $@ $^
-server: server.cpp Channel.cpp Epoll.cpp InetAddress.cpp Socket.cpp Util.cpp
+server: server.cpp src/Server.cpp src/Channel.cpp src/Epoll.cpp src/InetAddress.cpp src/Socket.cpp src/Util.cpp src/EventLoop.cpp src/Acceptor.cpp src/Connection.cpp
 	$(CC) $(CFLAGS) $@ $^
 
 .PHONY:clean

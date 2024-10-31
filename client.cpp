@@ -1,8 +1,8 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <iostream>
-#include "Util.h"
-#include "Config.h"
+#include "src/Util.h"
+#include "src/Config.h"
 
 int main() {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
