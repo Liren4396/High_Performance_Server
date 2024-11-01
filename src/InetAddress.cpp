@@ -13,3 +13,7 @@ struct sockaddr_in InetAddress::getSockAddress() {
 }
 
 InetAddress::~InetAddress() {}
+
+void InetAddress::setInetAddr(sockaddr_in _addr) {
+    serv_addr = _addr;
+}

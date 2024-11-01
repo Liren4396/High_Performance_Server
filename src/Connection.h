@@ -9,6 +9,7 @@ public:
     ~Connection();
     void echo(int sockfd);
     void setDeleteConnectionCallback(std::function<void(Socket*)>);
+    void send(int sockfd);
 
 private:
     EventLoop* loop;

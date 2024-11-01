@@ -37,14 +37,34 @@ void Connection::echo(int sockfd) {
             break;
         } else if (read_bytes == -1 && ((errno == EAGAIN) || (errno == EWOULDBLOCK))) {
             std::cout << "message from client" << sockfd << ": " << readBuffer->getBuffer() << std::endl;
-            errif(write(sockfd, readBuffer->c_str(), readBuffer->size()) == -1, "socket write error");
+            //errif(write(sockfd, readBuffer->c_str(), readBuffer->size()) == -1, "socket write error");
+            send(sockfd);
             readBuffer->clear();
             break;
         } else if (read_bytes == 0) {
             std::cout << "client" << sockfd << " disconnected" << std::endl;
             deleteConnectionCallback(sock);
             break;
+        } else {
+            std::cout << "Connection reset by peer" << std::endl;
+            deleteConnectionCallback(sock);          //会有bug，注释后单线程无bug
+            break;
         }
+    }
+}
+
+void Connection::send(int sockfd) {
+    char buf[readBuffer->size()];
+    strcpy(buf, readBuffer->c_str());
+    int data_size = readBuffer->size();
+    int data_left = data_size;
+    while (data_left > 0) {
+        ssize_t bytes_write = write(sockfd, buf + data_size - data_left, data_left);
+        std::cout << "1sdf" << std::endl;
+        if (bytes_write == -1 && errno == EAGAIN) {
+            break;
+        }
+        data_left -= bytes_write;
     }
 }
 

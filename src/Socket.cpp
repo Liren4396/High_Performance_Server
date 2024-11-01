@@ -37,6 +37,7 @@ int Socket::saccept(InetAddress* InetAddr) {
     socklen_t addr_len = sizeof(addr);
     int client_sockfd = accept(sockfd, (sockaddr*)&addr, &addr_len);
     errif(client_sockfd == -1, "accept socket error");
+    InetAddr->setInetAddr(addr);
     return client_sockfd;
 }
 
