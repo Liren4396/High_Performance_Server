@@ -26,8 +26,8 @@ Connection::~Connection() {
 }
 
 void Connection::echo(int sockfd) {
+    char buf[1024];
     while (true) {
-        char buf[1024];
         bzero(&buf, sizeof(buf));
         ssize_t read_bytes = read(sockfd, buf, sizeof(buf));
         if (read_bytes > 0) {
@@ -36,8 +36,7 @@ void Connection::echo(int sockfd) {
             std::cout << "continue reading" << std::endl;
             break;
         } else if (read_bytes == -1 && ((errno == EAGAIN) || (errno == EWOULDBLOCK))) {
-            std::cout << "finish reading " << std::endl;
-            std::cout << "message from client" << sockfd << ": " << buf << std::endl;
+            std::cout << "message from client" << sockfd << ": " << readBuffer->getBuffer() << std::endl;
             errif(write(sockfd, readBuffer->c_str(), readBuffer->size()) == -1, "socket write error");
             readBuffer->clear();
             break;

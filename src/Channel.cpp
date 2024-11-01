@@ -7,7 +7,7 @@ Channel::Channel(EventLoop* _loop, int fd1)
 Channel::~Channel() {}
 
 void Channel::handleEvent() {
-    callback();
+    loop->addThread(callback);
 }
 
 void Channel::enableReading() {

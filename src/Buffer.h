@@ -9,6 +9,7 @@ public:
     const char* c_str();
     void clear();
     void getline();
+    std::string getBuffer();
 private:
     std::string buf;
 };
