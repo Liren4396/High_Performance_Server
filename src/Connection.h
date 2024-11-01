@@ -1,5 +1,5 @@
 #include <functional>
-
+class Buffer;
 class EventLoop;
 class Socket;
 class Channel;
@@ -15,4 +15,6 @@ private:
     Socket* sock;
     Channel* channel;
     std::function<void(Socket*)> deleteConnectionCallback;
+    std::string *inBuffer;
+    Buffer *readBuffer;
 };
