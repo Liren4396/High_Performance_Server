@@ -11,7 +11,7 @@ public:
     int getFd();
     int saccept(InetAddress* InetAddr);
     void setnonblocking();
-
+    void Connect(InetAddress* addr);
 private:
     int sockfd;
 

@@ -12,10 +12,14 @@ void Buffer::append(const char* _str, int _size) {
         buf.push_back(_str[i]);
     }
 }
-
+void Buffer::SetBuf(std::string buffer) {
+    buf = buffer;
+}
 ssize_t Buffer::size() {
     return buf.size();
 }
+
+const char *Buffer::ToStr() { return buf.c_str(); }
 
 const char* Buffer::c_str() {
     return buf.c_str();

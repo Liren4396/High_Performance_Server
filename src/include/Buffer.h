@@ -10,6 +10,8 @@ public:
     void clear();
     void getline();
     std::string getBuffer();
+    void SetBuf(std::string buffer);
+    const char *ToStr();
 private:
     std::string buf;
 };

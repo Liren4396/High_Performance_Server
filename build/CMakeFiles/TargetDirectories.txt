@@ -1,0 +1,17 @@
+/home/dlr/Downloads/HS_SERVER/build/CMakeFiles/rebuild_cache.dir
+/home/dlr/Downloads/HS_SERVER/build/CMakeFiles/format.dir
+/home/dlr/Downloads/HS_SERVER/build/CMakeFiles/cpplint.dir
+/home/dlr/Downloads/HS_SERVER/build/CMakeFiles/edit_cache.dir
+/home/dlr/Downloads/HS_SERVER/build/CMakeFiles/check-format.dir
+/home/dlr/Downloads/HS_SERVER/build/CMakeFiles/clang-tidy.dir
+/home/dlr/Downloads/HS_SERVER/build/src/CMakeFiles/rebuild_cache.dir
+/home/dlr/Downloads/HS_SERVER/build/src/CMakeFiles/edit_cache.dir
+/home/dlr/Downloads/HS_SERVER/build/src/CMakeFiles/pine_shared.dir
+/home/dlr/Downloads/HS_SERVER/build/test/CMakeFiles/rebuild_cache.dir
+/home/dlr/Downloads/HS_SERVER/build/test/CMakeFiles/edit_cache.dir
+/home/dlr/Downloads/HS_SERVER/build/test/CMakeFiles/single_client.dir
+/home/dlr/Downloads/HS_SERVER/build/test/CMakeFiles/build-tests.dir
+/home/dlr/Downloads/HS_SERVER/build/test/CMakeFiles/thread_test.dir
+/home/dlr/Downloads/HS_SERVER/build/test/CMakeFiles/check-tests.dir
+/home/dlr/Downloads/HS_SERVER/build/test/CMakeFiles/server.dir
+/home/dlr/Downloads/HS_SERVER/build/test/CMakeFiles/multiple_client.dir
