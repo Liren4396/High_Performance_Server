@@ -56,5 +56,8 @@ void Server::deleteConnection(Socket* sock) {
             delete conn;
         }
     }
-    
+}
+
+void OnConnect(std::function<void(Connection*)> fn) {
+    on_connect_callback_ = fn;
 }
