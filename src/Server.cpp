@@ -38,16 +38,19 @@ Server::~Server() {
 }
 
 void Server::newConnection(Socket *serv_sock) {
+    std::lock_guard<std::mutex> guard(mutex_);
     if (serv_sock->getFd() != -1) {
         int random = serv_sock->getFd() % subReactors.size();
         Connection *conn = new Connection(subReactors[random], serv_sock);
         std::function<void(Socket*)> cb = std::bind(&Server::deleteConnection, this, std::placeholders::_1);
         conn->setDeleteConnectionCallback(cb);
         connections[serv_sock->getFd()] = conn;
+        
     }
 }
 
 void Server::deleteConnection(Socket* sock) {
+    std::lock_guard<std::mutex> guard(mutex_);
     if (sock->getFd() != -1) {
         auto it = connections.find(sock->getFd());
         if (it != connections.end()) {

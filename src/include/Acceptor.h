@@ -3,6 +3,7 @@
 class EventLoop;
 class Socket;
 class Channel;
+class Manager;
 class Acceptor {
 public:
     Acceptor(EventLoop* _loop);

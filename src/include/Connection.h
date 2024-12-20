@@ -1,4 +1,5 @@
 #include <functional>
+#include <string>
 class Buffer;
 class EventLoop;
 class Socket;
@@ -9,7 +10,7 @@ public:
     ~Connection();
     void echo(int sockfd);
     void setDeleteConnectionCallback(std::function<void(Socket*)>);
-    void send(int sockfd);
+    void send(int sockfd, std::string name);
     void Read();
     void Write();
 private:

@@ -9,6 +9,7 @@ public:
     void sbind(InetAddress* inetAddress);
     void slisten();
     int getFd();
+    void setFd(int fd);
     int saccept(InetAddress* InetAddr);
     void setnonblocking();
     void Connect(InetAddress* addr);

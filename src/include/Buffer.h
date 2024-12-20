@@ -12,6 +12,9 @@ public:
     std::string getBuffer();
     void SetBuf(std::string buffer);
     const char *ToStr();
+    void setName(std::string name);
+    std::string getName();
 private:
+    std::string _name;
     std::string buf;
 };

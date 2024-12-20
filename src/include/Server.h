@@ -1,6 +1,7 @@
 #pragma once
 #include <map>
 #include <vector>
+#include <mutex>
 class EventLoop;
 class Socket;
 class Acceptor;
@@ -23,4 +24,5 @@ private:
     std::vector<EventLoop*> subReactors;
     ThreadPool* thpool;
     std::function<void(Connection*)> on_connect_callback_;
+    std::mutex mutex_;
 };

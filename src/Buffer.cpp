@@ -6,7 +6,16 @@ Buffer::Buffer() {}
 
 Buffer::~Buffer() {}
 
+void Buffer::setName(std::string name) {
+    _name = name;
+}
+
+std::string Buffer::getName() {
+    return _name;
+}
+
 void Buffer::append(const char* _str, int _size) {
+    if (_str[0] == 25) return;
     for (int i = 0; i < _size; ++i) {
         if (_str[i] == '\0') break;
         buf.push_back(_str[i]);

@@ -1,3 +1,4 @@
+#include "include/Manager.h"
 #include "include/Acceptor.h"
 #include "include/Socket.h"
 #include "include/InetAddress.h"
@@ -9,12 +10,11 @@ Acceptor::Acceptor(EventLoop* _loop) : loop(_loop), sock(nullptr), acceptChannel
     sock->sbind(addr);
     sock->slisten();
     sock->setnonblocking();
-
     Channel* svrChannel = new Channel(loop, sock->getFd());
     std::function<void()> cb = std::bind(&Acceptor::acceptConnection, this);
-    svrChannel->setCallback(cb);
+    svrChannel->SetReadCallback(cb);
     svrChannel->enableReading();
-
+    
     delete addr;
 
 }
@@ -32,6 +32,7 @@ void Acceptor::acceptConnection() {
     cli->setnonblocking();
 
     newConnectionCallback(cli);
+    Manager::getInstance().append(cli->getFd());
     printf("new client fd %d! IP: %s Port: %d\n", cli->getFd(), inet_ntoa(client_addr->getSockAddress().sin_addr), ntohs(client_addr->getSockAddress().sin_port));
     delete client_addr;
 }

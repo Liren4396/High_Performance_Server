@@ -1,17 +1,31 @@
+#include <sys/epoll.h>
+#include <unistd.h>
+#include <utility>
+
 #include "include/Channel.h"
 #include "include/EventLoop.h"
-
+#include "include/Socket.h"
 Channel::Channel(EventLoop* _loop, int fd1)
     :loop(_loop), fd(fd1), events(0), revents(0), inEpoll(false) {}
 
-Channel::~Channel() {}
+Channel::~Channel() {
+    if (fd != -1) {
+        close(fd);
+        fd = -1;
+    }
+}
 
 void Channel::handleEvent() {
-    loop->addThread(callback);
+  if (revents & (EPOLLIN | EPOLLPRI)) {
+    read_callback_();
+  }
+  if (revents & (EPOLLOUT)) {
+    write_callback_();
+  }
 }
 
 void Channel::enableReading() {
-    events = EPOLLIN | EPOLLET;
+    events |= EPOLLIN | EPOLLET;
     loop->updateChannel(this);
 }
 
@@ -19,8 +33,11 @@ int Channel::getFd() {
     return fd;
 }
 
-void Channel::setInEpoll() {
-    inEpoll = true;
+void Channel::setInEpoll(bool in) { inEpoll = in; }
+
+void Channel::useET() {
+    events |= EPOLLET;
+    loop->updateChannel(this);
 }
 
 bool Channel::getInEpoll() {
@@ -38,7 +55,4 @@ uint32_t Channel::getRevents() {
 void Channel::setRevents(uint32_t r) {
     revents = r;
 }
-
-void Channel::setCallback(std::function<void()> _cb) {
-    callback = _cb;
-}
+void Channel::SetReadCallback(std::function<void()> const &callback) { read_callback_ = callback; }

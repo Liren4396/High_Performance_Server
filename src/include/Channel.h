@@ -12,21 +12,22 @@ public:
 
     int getFd();
 
-    void setInEpoll();
+    void setInEpoll(bool in = true);
 
     bool getInEpoll();
 
     uint32_t getEvents();
-
+    void useET();
     uint32_t getRevents();
 
     void setRevents(uint32_t r);
-    void setCallback(std::function<void()> _cb);
+    void SetReadCallback(std::function<void()> const &callback);
 private:
     EventLoop* loop;
     int fd;
     uint32_t events;
     uint32_t revents;
     bool inEpoll;
-    std::function<void()> callback;
+    std::function<void()> read_callback_;
+    std::function<void()> write_callback_;
 };

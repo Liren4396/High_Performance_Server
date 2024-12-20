@@ -79,3 +79,7 @@ void Socket::Connect(InetAddress *addr) {
     errif(connect(sockfd, (sockaddr *)&tmp_addr, sizeof(tmp_addr)) == -1, "socket connect error");
   }
 }
+
+void Socket::setFd(int fd) {
+  sockfd = fd;
+}
