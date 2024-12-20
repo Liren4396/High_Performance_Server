@@ -1,5 +1,5 @@
-#include "src/EventLoop.h"
-#include "src/Server.h"
+#include "src/include/EventLoop.h"
+#include "src/include/Server.h"
 
 int main() {
     EventLoop *eventLoop = new EventLoop();

@@ -1,9 +1,9 @@
-#include "Connection.h"
-#include "Socket.h"
-#include "Channel.h"
-#include "Server.h"
-#include "Buffer.h"
-#include "Util.h"
+#include "include/Connection.h"
+#include "include/Socket.h"
+#include "include/Channel.h"
+#include "include/Server.h"
+#include "include/Buffer.h"
+#include "include/Util.h"
 
 #include <unistd.h>
 #include <string.h>
@@ -60,7 +60,6 @@ void Connection::send(int sockfd) {
     int data_left = data_size;
     while (data_left > 0) {
         ssize_t bytes_write = write(sockfd, buf + data_size - data_left, data_left);
-        std::cout << "1sdf" << std::endl;
         if (bytes_write == -1 && errno == EAGAIN) {
             break;
         }

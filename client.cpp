@@ -1,8 +1,8 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <iostream>
-#include "src/Util.h"
-#include "src/Config.h"
+#include "src/include/Util.h"
+#include "src/include/Config.h"
 
 int main() {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -23,9 +23,9 @@ int main() {
         bzero(&buf, sizeof(buf));
         ssize_t read_bytes = read(sockfd, buf, sizeof(buf));
         if (read_bytes > 0) {
-            cout << "message from srever: " << buf << endl;
+            std::cout << "message from srever: " << buf << std::endl;
         } else if (read_bytes == 0) {
-            cout << "server disconnected" << endl;
+            std::cout << "server disconnected" << std::endl;
             close(sockfd);
             break;
         } else {

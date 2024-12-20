@@ -1,5 +1,5 @@
-#include "Channel.h"
-#include "EventLoop.h"
+#include "include/Channel.h"
+#include "include/EventLoop.h"
 
 Channel::Channel(EventLoop* _loop, int fd1)
     :loop(_loop), fd(fd1), events(0), revents(0), inEpoll(false) {}

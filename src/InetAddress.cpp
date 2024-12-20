@@ -1,6 +1,6 @@
 #include <string.h>
-#include "InetAddress.h"
-#include "Config.h"
+#include "include/InetAddress.h"
+#include "include/Config.h"
 InetAddress::InetAddress() {
     bzero(&serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;

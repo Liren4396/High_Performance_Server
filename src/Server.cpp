@@ -5,15 +5,15 @@
 #include <errno.h>
 #include <vector>
 #include <functional>
-#include "Epoll.h"
-#include "InetAddress.h"
-#include "Socket.h"
-#include "Channel.h"
-#include "EventLoop.h"
-#include "Server.h"
-#include "Acceptor.h"
-#include "Connection.h"
-#include "ThreadPool.h"
+#include "include/Epoll.h"
+#include "include/InetAddress.h"
+#include "include/Socket.h"
+#include "include/Channel.h"
+#include "include/EventLoop.h"
+#include "include/Server.h"
+#include "include/Acceptor.h"
+#include "include/Connection.h"
+#include "include/ThreadPool.h"
 
 Server::Server(EventLoop* loop): mainReactor(loop), acceptor(nullptr) {
     acceptor = new Acceptor(mainReactor);
@@ -58,6 +58,6 @@ void Server::deleteConnection(Socket* sock) {
     }
 }
 
-void OnConnect(std::function<void(Connection*)> fn) {
+void Server::OnConnect(std::function<void(Connection*)> fn) {
     on_connect_callback_ = fn;
 }
