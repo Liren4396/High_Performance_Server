@@ -97,7 +97,7 @@ void Connection::deleteFromDB(int fd) {
     if (mysql_conn!= NULL) {
         // 构造删除对应记录的SQL语句，根据fd删除visitor表中对应的记录，这里假设fd字段唯一标识一条记录
         char sql[256];
-        sprintf(sql, "DELETE FROM visitor WHERE fd = %d", fd);
+        sprintf(sql, "DELETE FROM current_visitor WHERE fd = %d", fd);
         if (mysql_query(mysql_conn, sql)) {
             std::cerr << "mysql_query() failed: " << mysql_error(mysql_conn) << std::endl;
             // 根据实际情况，这里可以选择更合适的错误处理方式，比如抛出异常或者返回错误码等

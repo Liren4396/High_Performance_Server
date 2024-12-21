@@ -1,0 +1,16 @@
+ChatRoom {
+    visitor { 这个类需要仔细考虑 fd不应该保存会冲突 可以用自增id来代替 名字可以重复 并且可以添加最后登录时间timestamp 和 最后发表的言论
+        fd int,
+        name varchar,
+    } 
+    current_visitor {
+        fd int,
+        name varchar,
+    }
+    // TODO 新增的类
+    history {
+        sentence varchar or char
+        userid int
+    }
+
+}

@@ -30,7 +30,7 @@ Acceptor::~Acceptor() {
 
 void Acceptor::insertToDB(int fd) {
     char sql[256];
-    sprintf(sql, "INSERT INTO visitor (fd, name) VALUES (%d, 0)", fd);
+    sprintf(sql, "INSERT INTO current_visitor (fd, name) VALUES (%d, 0)", fd);
     MYSQL* mysql_conn = MySQLManager::getInstance().getConnection();
     if (mysql_conn != NULL) {
         if (mysql_query(mysql_conn, sql)) {
