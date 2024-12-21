@@ -5,13 +5,22 @@
 #include "include/Buffer.h"
 #include "include/Util.h"
 #include "include/Manager.h"
+#include "include/MysqlManager.h"
 
 #include <unistd.h>
 #include <string.h>
 #include <iostream>
 #include <vector>
+#include <mysql/mysql.h>
 
 #define READ_BUFFER 1024
+
+void executeSql(MYSQL* conn, const char* sql) {
+    if (mysql_query(conn, sql)) {
+        std::cerr << "mysql_query() failed: " << mysql_error(conn) << std::endl;
+        return;
+    }
+}
 
 Connection::Connection(EventLoop* _loop, Socket* _sock) : loop(_loop), sock(_sock), channel(nullptr) {
     channel = new Channel(loop, sock->getFd());
@@ -20,6 +29,10 @@ Connection::Connection(EventLoop* _loop, Socket* _sock) : loop(_loop), sock(_soc
     std::function<void()> cb = std::bind(&Connection::echo, this, sock->getFd());
     channel->SetReadCallback(cb);
     readBuffer = new Buffer();
+    mysql_conn = MySQLManager::getInstance().getConnection();
+    if (mysql_conn == NULL) {
+        std::cerr << "Failed to get MySQL connection in Connection" << std::endl;
+    }
 }
 
 Connection::~Connection() {
@@ -56,8 +69,8 @@ void Connection::echo(int sockfd) {
             std::cout << "message from " << readBuffer->getName() << ": " << readBuffer->getBuffer() << std::endl;
             //errif(write(sockfd, readBuffer->c_str(), readBuffer->size()) == -1, "socket write error");
             std::vector<int> list = Manager::getInstance().getFds();
-            for (int fd: list) {
-                std::cout << fd << " ";
+            int if_recorded_inDB = 0;
+            for (int fd : list) {
                 if (fd != sockfd) {
                     send(fd, readBuffer->getName());
                 }
@@ -68,9 +81,8 @@ void Connection::echo(int sockfd) {
         } else if (read_bytes == 0) {
             std::cout << "client" << sockfd << " disconnected" << std::endl;
             
+            deleteFromDB(sockfd);
             Manager::getInstance().remove(sockfd);
-            //std::vector<int> list = Manager::getInstance().getFds();
-            //list.erase(std::remove(list.begin(), list.end(), sockfd), list.end());
             deleteConnectionCallback(sockfd);
             break;
         } else {
@@ -81,16 +93,24 @@ void Connection::echo(int sockfd) {
     }
 }
 
+void Connection::deleteFromDB(int fd) {
+    if (mysql_conn!= NULL) {
+        // 构造删除对应记录的SQL语句，根据fd删除visitor表中对应的记录，这里假设fd字段唯一标识一条记录
+        char sql[256];
+        sprintf(sql, "DELETE FROM visitor WHERE fd = %d", fd);
+        if (mysql_query(mysql_conn, sql)) {
+            std::cerr << "mysql_query() failed: " << mysql_error(mysql_conn) << std::endl;
+            // 根据实际情况，这里可以选择更合适的错误处理方式，比如抛出异常或者返回错误码等
+            return;
+        }
+    }
+}
+
 void Connection::send(int sockfd, std::string name) {
-    // 计算拼接后总的数据长度，包括name长度、分隔符长度（这里是1个字符）和原readBuffer内容长度
     int total_size = name.size() + 1 + readBuffer->size();
     char buf[total_size];
-
-    // 先将name复制到buf中
     strcpy(buf, name.c_str());
-    // 再添加分隔符，这里用'\3'作为示例分隔符，你可按需替换
     buf[name.size()] = '\3';
-    // 最后将readBuffer中的内容复制到buf中
     strcpy(buf + name.size() + 1, readBuffer->c_str());
 
     int data_size = total_size;

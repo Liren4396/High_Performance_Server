@@ -1,5 +1,6 @@
 #include <functional>
 #include <string>
+#include <mysql/mysql.h>
 class Buffer;
 class EventLoop;
 class Socket;
@@ -13,6 +14,7 @@ public:
     void send(int sockfd, std::string name);
     void Read();
     void Write();
+    void deleteFromDB(int fd);
 private:
     EventLoop* loop;
     Socket* sock;
@@ -20,4 +22,5 @@ private:
     std::function<void(int)> deleteConnectionCallback;
     std::string *inBuffer;
     Buffer *readBuffer;
+    MYSQL* mysql_conn;
 };
