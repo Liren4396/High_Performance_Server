@@ -25,6 +25,7 @@ Connection::Connection(EventLoop* _loop, Socket* _sock) : loop(_loop), sock(_soc
 Connection::~Connection() {
     delete channel;
     delete sock;
+    delete readBuffer;
 }
 
 void Connection::echo(int sockfd) {
@@ -56,21 +57,25 @@ void Connection::echo(int sockfd) {
             //errif(write(sockfd, readBuffer->c_str(), readBuffer->size()) == -1, "socket write error");
             std::vector<int> list = Manager::getInstance().getFds();
             for (int fd: list) {
+                std::cout << fd << " ";
                 if (fd != sockfd) {
                     send(fd, readBuffer->getName());
                 }
             }
+            std::cout << std::endl;
             readBuffer->clear();
             break;
         } else if (read_bytes == 0) {
             std::cout << "client" << sockfd << " disconnected" << std::endl;
-            std::vector<int> list = Manager::getInstance().getFds();
-            list.erase(std::remove(list.begin(), list.end(), sockfd), list.end());
-            deleteConnectionCallback(sock);
+            
+            Manager::getInstance().remove(sockfd);
+            //std::vector<int> list = Manager::getInstance().getFds();
+            //list.erase(std::remove(list.begin(), list.end(), sockfd), list.end());
+            deleteConnectionCallback(sockfd);
             break;
         } else {
             std::cout << "Connection reset by peer" << std::endl;
-            deleteConnectionCallback(sock);          //会有bug，注释后单线程无bug
+            deleteConnectionCallback(sockfd);          //会有bug，注释后单线程无bug
             break;
         }
     }
@@ -99,6 +104,6 @@ void Connection::send(int sockfd, std::string name) {
     }
 }
 
-void Connection::setDeleteConnectionCallback(std::function<void(Socket*)> _cb) {
+void Connection::setDeleteConnectionCallback(std::function<void(int)> const &_cb) {
     deleteConnectionCallback = _cb;
 }

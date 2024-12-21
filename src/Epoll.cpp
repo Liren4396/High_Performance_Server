@@ -53,3 +53,9 @@ Epoll::Epoll() {
     events = new epoll_event[MAX_EVENTS];
     bzero(events, sizeof(epoll_event) * MAX_EVENTS);
 }
+
+void Epoll::DeleteChannel(Channel *ch) {
+    int fd = ch->getFd();
+    errif(epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr) == -1, "epoll delete error");
+    ch->setInEpoll(false);
+}

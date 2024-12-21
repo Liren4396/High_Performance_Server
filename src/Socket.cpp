@@ -12,7 +12,10 @@ Socket::Socket() {
 
 
 Socket::~Socket() {
-
+    if (sockfd != -1) {
+        close(sockfd);
+        sockfd = -1;
+    }
 }
 
 Socket::Socket(int fd) : sockfd(fd) {
@@ -33,12 +36,28 @@ int Socket::getFd() {
 }
 
 int Socket::saccept(InetAddress* InetAddr) {
+    int clnt_sockfd = -1;
     struct sockaddr_in addr = InetAddr->getSockAddress();
     socklen_t addr_len = sizeof(addr);
-    int client_sockfd = accept(sockfd, (sockaddr*)&addr, &addr_len);
-    errif(client_sockfd == -1, "accept socket error");
+    if (fcntl(sockfd, F_GETFL) & O_NONBLOCK) {
+        while (true) {
+            clnt_sockfd = accept(sockfd, (sockaddr *)&addr, &addr_len);
+            if (clnt_sockfd == -1 && ((errno == EAGAIN) || (errno == EWOULDBLOCK))) {
+                // printf("no connection yet\n");
+                continue;
+            }
+            if (clnt_sockfd == -1) {
+                errif(true, "socket accept error");
+            } else {
+                break;
+            }
+        }
+    } else {
+        clnt_sockfd = accept(sockfd, (sockaddr *)&addr, &addr_len);
+        errif(clnt_sockfd == -1, "accept socket error");
+    }
     InetAddr->setInetAddr(addr);
-    return client_sockfd;
+    return clnt_sockfd;
 }
 
 void Socket::setnonblocking() {

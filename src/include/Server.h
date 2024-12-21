@@ -15,7 +15,7 @@ public:
 
     void handleReadEvent(int sockfd);
     void newConnection(Socket *serv_sock);
-    void deleteConnection(Socket *sock);
+    void deleteConnection(int sock);
     void OnConnect(std::function<void(Connection*)> fn);
 private:
     EventLoop* mainReactor;

@@ -11,6 +11,7 @@ public:
     std::vector<Channel*> poll();
     ~Epoll();
     void updateChannel(Channel* channel);
+    void DeleteChannel(Channel *ch);
 private:
     int epfd;
     struct epoll_event* events;
