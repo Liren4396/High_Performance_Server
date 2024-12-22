@@ -28,9 +28,12 @@ Acceptor::~Acceptor() {
     
 }
 
-void Acceptor::insertToDB(int fd) {
+void Acceptor::insertToDB(int fd, std::string ip, std::time_t timestamp) {
     char sql[256];
-    sprintf(sql, "INSERT INTO visitor (fd, name) VALUES (%d, 0)", fd);
+    char buffer[80];
+    struct tm* timeinfo = localtime(&timestamp);
+    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
+    sprintf(sql, "INSERT INTO current_visitor (login_time, fd, name, ip) VALUES ('%s', '%d', '', '%s')", buffer, fd, ip.c_str());
     MYSQL* mysql_conn = MySQLManager::getInstance().getConnection();
     if (mysql_conn != NULL) {
         if (mysql_query(mysql_conn, sql)) {
@@ -43,13 +46,15 @@ void Acceptor::acceptConnection() {
     InetAddress* client_addr = new InetAddress();   // 会有内存泄漏, 并且无法delete
     int cliFd = sock->saccept(client_addr);          // 会有内存泄漏, 并且无法delete
     Socket* cli = new Socket(cliFd); 
-    
+    auto now = std::chrono::system_clock::now();
+    std::time_t timestamp = std::chrono::system_clock::to_time_t(now);
     cli->setnonblocking();
 
     newConnectionCallback(cli);
-    Manager::getInstance().append(cli->getFd());
-    printf("new client fd %d! IP: %s Port: %d\n", cli->getFd(), inet_ntoa(client_addr->getSockAddress().sin_addr), ntohs(client_addr->getSockAddress().sin_port));
-    insertToDB(cli->getFd());
+    Manager::getInstance().append(cli->getFd()); 
+    std::string clientIP = inet_ntoa(client_addr->getSockAddress().sin_addr);
+    printf("new client fd %d! IP: %s Port: %d\n", cli->getFd(), clientIP.c_str(), ntohs(client_addr->getSockAddress().sin_port));
+    insertToDB(cli->getFd(), clientIP, timestamp);
     delete client_addr;
 }
 

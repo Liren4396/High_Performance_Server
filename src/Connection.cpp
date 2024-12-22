@@ -55,13 +55,14 @@ void Connection::echo(int sockfd) {
                     // 提取从start到i位置（不包含i，因为i位置是'\3'分隔符）的消息内容
                     std::string message(buf, i);
                     readBuffer->setName(message);
+                    updateNameInDB(sockfd, message);
                     // 处理完这条消息后，更新start位置，准备查找下一个消息
                     start = i + 1;
                     break;
                 }
             }
             readBuffer->append(buf+start, read_bytes);
-
+            insertToHistoryDB(readBuffer->getName(), readBuffer->getBuffer());
         } else if (read_bytes == -1 && errno == EINTR) {
             std::cout << "continue reading" << std::endl;
             break;
@@ -75,13 +76,12 @@ void Connection::echo(int sockfd) {
                     send(fd, readBuffer->getName());
                 }
             }
-            std::cout << std::endl;
             readBuffer->clear();
             break;
         } else if (read_bytes == 0) {
             std::cout << "client" << sockfd << " disconnected" << std::endl;
             
-            deleteFromDB(sockfd);
+            deleteCurrentVisitorFromDB(sockfd);
             Manager::getInstance().remove(sockfd);
             deleteConnectionCallback(sockfd);
             break;
@@ -93,14 +93,85 @@ void Connection::echo(int sockfd) {
     }
 }
 
-void Connection::deleteFromDB(int fd) {
+void Connection::insertToHistoryDB(const std::string& name, const std::string& sentence) {
     if (mysql_conn!= NULL) {
-        // 构造删除对应记录的SQL语句，根据fd删除visitor表中对应的记录，这里假设fd字段唯一标识一条记录
         char sql[256];
-        sprintf(sql, "DELETE FROM visitor WHERE fd = %d", fd);
+        sprintf(sql, "INSERT INTO history (sentence, name) VALUES ('%s', '%s')", sentence.c_str(), name.c_str());
         if (mysql_query(mysql_conn, sql)) {
             std::cerr << "mysql_query() failed: " << mysql_error(mysql_conn) << std::endl;
-            // 根据实际情况，这里可以选择更合适的错误处理方式，比如抛出异常或者返回错误码等
+            return;
+        }
+    }
+}
+
+void Connection::updateNameInDB(int sockfd, const std::string& name) {
+    if (mysql_conn!= NULL) {
+        char selectSql[256];
+        sprintf(selectSql, "SELECT name FROM current_visitor WHERE fd = %d", sockfd);
+        if (mysql_query(mysql_conn, selectSql)) {
+            std::cerr << "mysql_query() failed in select for name: " << mysql_error(mysql_conn) << std::endl;
+            return;
+        }
+
+        MYSQL_RES* result = mysql_store_result(mysql_conn);
+        if (result == NULL) {
+            std::cerr << "mysql_store_result() failed: " << mysql_error(mysql_conn) << std::endl;
+            return;
+        }
+
+        MYSQL_ROW row = mysql_fetch_row(result);
+        if (row!= NULL) {
+            std::string currentName = row[0];
+            if (currentName.empty()) {
+                // 如果当前名字为空字符串，构造UPDATE语句更新名字
+                char updateSql[256];
+                sprintf(updateSql, "UPDATE current_visitor SET name = '%s' WHERE fd = %d", name.c_str(), sockfd);
+                if (mysql_query(mysql_conn, updateSql)) {
+                    std::cerr << "mysql_query() failed in update: " << mysql_error(mysql_conn) << std::endl;
+                    return;
+                }
+            }
+        }
+        mysql_free_result(result);
+    }
+}
+
+void Connection::insertToVisitorDB(int fd) {
+    char selectSql[256];
+    sprintf(selectSql, "SELECT login_time, name, ip FROM current_visitor WHERE fd = %d", fd);
+    if (mysql_query(mysql_conn, selectSql)) {
+        std::cerr << "mysql_query() failed in select: " << mysql_error(mysql_conn) << std::endl;
+        return;
+    }
+    MYSQL_RES* result = mysql_store_result(mysql_conn);
+    if (result == NULL) {
+        std::cerr << "mysql_store_result() failed: " << mysql_error(mysql_conn) << std::endl;
+        return;
+    }
+    MYSQL_ROW row = mysql_fetch_row(result);
+    if (row!= NULL) {
+        auto now = std::chrono::system_clock::now();
+        std::time_t logout_timestamp = std::chrono::system_clock::to_time_t(now);
+        char buffer[80];
+        struct tm* timeinfo = localtime(&logout_timestamp);
+        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
+        char insertSql[256];
+        sprintf(insertSql, "INSERT INTO visitor (login_time, logout_time, name, ip) VALUES ('%s', '%s', '%s', '%s')",
+                row[0], buffer, row[1], row[2]);
+        if (mysql_query(mysql_conn, insertSql)) {
+            std::cerr << "mysql_query() failed in insert: " << mysql_error(mysql_conn) << std::endl;
+            return;
+        }
+    }
+}
+
+void Connection::deleteCurrentVisitorFromDB(int fd) {
+    if (mysql_conn!= NULL) {
+        insertToVisitorDB(fd);
+        char sql[256];
+        sprintf(sql, "DELETE FROM current_visitor WHERE fd = %d", fd);
+        if (mysql_query(mysql_conn, sql)) {
+            std::cerr << "mysql_query() failed: " << mysql_error(mysql_conn) << std::endl;
             return;
         }
     }
