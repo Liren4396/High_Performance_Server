@@ -43,6 +43,7 @@ Connection::~Connection() {
 
 void Connection::echo(int sockfd) {
     char buf[1024];
+    int flag = 1;
     while (true) {
         memset(&buf, 0, sizeof(buf));
         ssize_t read_bytes = read(sockfd, buf, sizeof(buf));
@@ -51,6 +52,7 @@ void Connection::echo(int sockfd) {
             size_t start = 0;
             for (size_t i = 0; i < read_bytes; ++i) {
                 if (buf[i] == '\0') break;
+                //if (buf[i] == 25) return;
                 if (buf[i] == '\3') {
                     // 提取从start到i位置（不包含i，因为i位置是'\3'分隔符）的消息内容
                     std::string message(buf, i);
@@ -62,7 +64,10 @@ void Connection::echo(int sockfd) {
                 }
             }
             readBuffer->append(buf+start, read_bytes);
-            insertToHistoryDB(readBuffer->getName(), readBuffer->getBuffer());
+            if (flag == 1) {
+                insertToHistoryDB(readBuffer->getName(), readBuffer->getBuffer());
+                flag = 0;
+            }
         } else if (read_bytes == -1 && errno == EINTR) {
             std::cout << "continue reading" << std::endl;
             break;

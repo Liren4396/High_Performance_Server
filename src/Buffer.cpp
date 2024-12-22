@@ -15,8 +15,9 @@ std::string Buffer::getName() {
 }
 
 void Buffer::append(const char* _str, int _size) {
-    if (_str[0] == 25) return;
+    if (_str[0] == 25 || _str[0] == 23) return;
     for (int i = 0; i < _size; ++i) {
+        std::cout << (int)_str[i] << std::endl;
         if (_str[i] == '\0') break;
         buf.push_back(_str[i]);
     }
