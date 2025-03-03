@@ -1,0 +1,43 @@
+Performing C++ SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /home/dlr/Downloads/c-_Boost_Search/cpp-httplib/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_347eb/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_347eb.dir/build.make CMakeFiles/cmTC_347eb.dir/build
+gmake[1]: Entering directory `/home/dlr/Downloads/c-_Boost_Search/cpp-httplib/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_347eb.dir/src.cxx.o
+/usr/bin/c++ -DCMAKE_HAVE_LIBC_PTHREAD   -o CMakeFiles/cmTC_347eb.dir/src.cxx.o -c /home/dlr/Downloads/c-_Boost_Search/cpp-httplib/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_347eb
+/home/dlr/Downloads/cmake-3.20.6-linux-x86_64/bin/cmake -E cmake_link_script CMakeFiles/cmTC_347eb.dir/link.txt --verbose=1
+/usr/bin/c++ CMakeFiles/cmTC_347eb.dir/src.cxx.o -o cmTC_347eb 
+CMakeFiles/cmTC_347eb.dir/src.cxx.o: In function `main':
+src.cxx:(.text+0x2d): undefined reference to `pthread_create'
+src.cxx:(.text+0x39): undefined reference to `pthread_detach'
+src.cxx:(.text+0x45): undefined reference to `pthread_cancel'
+src.cxx:(.text+0x56): undefined reference to `pthread_join'
+src.cxx:(.text+0x6a): undefined reference to `pthread_atfork'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [cmTC_347eb] Error 1
+gmake[1]: Leaving directory `/home/dlr/Downloads/c-_Boost_Search/cpp-httplib/CMakeFiles/CMakeTmp'
+gmake: *** [cmTC_347eb/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+static void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+

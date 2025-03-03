@@ -1,3 +1,4 @@
+// Connection.cpp
 #include "include/Connection.h"
 #include "include/Socket.h"
 #include "include/Channel.h"
@@ -23,22 +24,42 @@ void executeSql(MYSQL* conn, const char* sql) {
 }
 
 Connection::Connection(EventLoop* _loop, Socket* _sock) : loop(_loop), sock(_sock), channel(nullptr) {
-    channel = new Channel(loop, sock->getFd());
-    channel->enableReading();
-    channel->useET();
-    std::function<void()> cb = std::bind(&Connection::echo, this, sock->getFd());
-    channel->SetReadCallback(cb);
-    readBuffer = new Buffer();
-    mysql_conn = MySQLManager::getInstance().getConnection();
-    if (mysql_conn == NULL) {
-        std::cerr << "Failed to get MySQL connection in Connection" << std::endl;
+    if (sock!= nullptr && sock->getFd() >= 0 && _loop!= nullptr) {
+        channel = new Channel(loop, sock->getFd());
+        if (channel!= nullptr) {
+            channel->enableReading();
+            channel->useET();
+            std::function<void()> cb = std::bind(&Connection::echo, this, sock->getFd());
+            channel->SetReadCallback(cb);
+        } else {
+            std::cerr << "Failed to create Channel for the new connection" << std::endl;
+            // 可以在这里添加合适的错误处理逻辑，比如关闭Socket等资源，避免资源泄漏
+            if (sock!= nullptr) {
+                sock->~Socket();
+            }
+        }
+    } else {
+        std::cerr << "Invalid Socket or EventLoop for new connection" << std::endl;
     }
+    readBuffer = new Buffer();
+    //mysql_conn = MySQLManager::getInstance().getConnection();
+    //if (mysql_conn == NULL) {
+    //    std::cerr << "Failed to get MySQL connection in Connection" << std::endl;
+    //}
 }
 
 Connection::~Connection() {
-    delete channel;
-    delete sock;
-    delete readBuffer;
+    if (channel!= nullptr) {
+        channel->~Channel();
+        delete channel;
+    }
+    if (sock!= nullptr) {
+        sock->~Socket();
+        delete sock;
+    }
+    if (readBuffer!= nullptr) {
+        delete readBuffer;
+    }
 }
 
 void Connection::echo(int sockfd) {
@@ -51,23 +72,23 @@ void Connection::echo(int sockfd) {
         if (read_bytes > 0) {
             size_t start = 0;
             for (size_t i = 0; i < read_bytes; ++i) {
-                if (buf[i] == '\0') break;
+                // if (buf[i] == '\0') break;
                 //if (buf[i] == 25) return;
                 if (buf[i] == '\3') {
                     // 提取从start到i位置（不包含i，因为i位置是'\3'分隔符）的消息内容
                     std::string message(buf, i);
                     readBuffer->setName(message);
-                    updateNameInDB(sockfd, message);
+                    //updateNameInDB(sockfd, message);
                     // 处理完这条消息后，更新start位置，准备查找下一个消息
                     start = i + 1;
                     break;
                 }
             }
             readBuffer->append(buf+start, read_bytes);
-            if (flag == 1) {
-                insertToHistoryDB(readBuffer->getName(), readBuffer->getBuffer());
-                flag = 0;
-            }
+            //if (flag == 1) {
+            //    insertToHistoryDB(readBuffer->getName(), readBuffer->getBuffer());
+            //    flag = 0;
+           // }
         } else if (read_bytes == -1 && errno == EINTR) {
             std::cout << "continue reading" << std::endl;
             break;
@@ -86,7 +107,7 @@ void Connection::echo(int sockfd) {
         } else if (read_bytes == 0) {
             std::cout << "client" << sockfd << " disconnected" << std::endl;
             
-            deleteCurrentVisitorFromDB(sockfd);
+            //deleteCurrentVisitorFromDB(sockfd);
             Manager::getInstance().remove(sockfd);
             deleteConnectionCallback(sockfd);
             break;
@@ -172,7 +193,7 @@ void Connection::insertToVisitorDB(int fd) {
 
 void Connection::deleteCurrentVisitorFromDB(int fd) {
     if (mysql_conn!= NULL) {
-        insertToVisitorDB(fd);
+        //insertToVisitorDB(fd);
         char sql[256];
         sprintf(sql, "DELETE FROM current_visitor WHERE fd = %d", fd);
         if (mysql_query(mysql_conn, sql)) {

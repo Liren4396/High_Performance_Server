@@ -1,3 +1,4 @@
+// ThreadPool.h
 #include <functional>
 #include <vector>
 #include <queue>
@@ -8,7 +9,7 @@
 
 class ThreadPool {
 public:
-    ThreadPool(int size = 10);
+    ThreadPool(int size = 50);
     ~ThreadPool();
     template<class F, class... Args>
     auto add(F&& f, Args&&... args) -> std::future<typename std::result_of<F(Args...)>::type>;

@@ -11,8 +11,6 @@
 #include "src/include/Config.h"
 #include <mysql/mysql.h>
 
-// 假设errif函数用于错误处理，若实际实现不同需相应调整
-// 功能为当条件满足时输出错误信息并退出程序
 #define errif(condition, message) \
     if (condition) { \
         std::cerr << message << ": " << strerror(errno) << std::endl; \
@@ -20,7 +18,7 @@
     }
 
 int main() {
-    int sockfd;  // 将sockfd的定义移到这里，使其作用域覆盖后续代码
+    int sockfd;
 
     // 创建套接字
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -75,44 +73,6 @@ int main() {
                     // 连接成功后，修改关注事件为可读和异常事件，用于后续数据读写
                     event.events = EPOLLIN | EPOLLERR;
                     errif(epoll_ctl(epoll_fd, EPOLL_CTL_MOD, sockfd, &event) == -1, "epoll_ctl mod error");
-
-                    // 连接成功后，尝试连接MySQL数据库并读取history表最后五条记录
-                    MYSQL* mysql_conn = mysql_init(NULL);
-                    if (mysql_conn == NULL) {
-                        errif(true, "mysql_init error");
-                    }
-                    if (mysql_real_connect(mysql_conn, "localhost", "visitor", "123456", "ChatRoomDB", 0, NULL, 0) == NULL) {
-                        std::cerr << "mysql_real_connect error: " << mysql_error(mysql_conn) << std::endl;
-                        // 这里可以选择继续尝试连接或者直接退出，目前示例选择直接退出
-                        exit(EXIT_FAILURE);
-                    }
-
-                    // 构造查询语句，获取history表的最后五条记录，假设history表结构如之前定义，有id、sentence、user_id字段
-                    char sql[256];
-                    sprintf(sql, "SELECT sentence, name FROM history ORDER BY id DESC LIMIT 5");
-                    if (mysql_query(mysql_conn, sql)) {
-                        std::cerr << "mysql_query() failed: " << mysql_error(mysql_conn) << std::endl;
-                        // 根据实际情况处理查询失败情况，目前示例选择直接退出
-                        exit(EXIT_FAILURE);
-                    }
-
-                    MYSQL_RES* result = mysql_store_result(mysql_conn);
-                    if (result == NULL) {
-                        std::cerr << "mysql_store_result() failed: " << mysql_error(mysql_conn) << std::endl;
-                        // 根据实际情况处理结果获取失败情况，目前示例选择直接退出
-                        exit(EXIT_FAILURE);
-                    }
-
-                    // 输出提示信息，表示即将打印历史记录
-                    std::cout << "最近五条历史记录如下：" << std::endl;
-                    // 解析并输出查询结果
-                    MYSQL_ROW row;
-                    while ((row = mysql_fetch_row(result))) {
-                        std::cout << row[0] << " said by " << row[1] << std::endl;
-                    }
-
-                    mysql_free_result(result);
-                    mysql_close(mysql_conn);
                 } else {
                     errif(true, "connect socket error");
                 }
@@ -140,7 +100,6 @@ int main() {
 
         int ret = select(sockfd + 1, &read_fds, NULL, NULL, &timeout);
         errif(ret == -1, "select error");
-
         if (ret == 0) {
             // 超时情况，这里可以什么都不做，直接进入下一次循环继续等待事件
             continue;
@@ -187,6 +146,7 @@ int main() {
         }
 
         if (FD_ISSET(STDIN_FILENO, &read_fds)) {
+            
             std::string input;
             std::cin >> input;
             if (input == "bye") {
@@ -195,18 +155,16 @@ int main() {
                 std::cout << "exit" << std::endl;
                 return 0;
             }
+
             if (!input.empty()) {
                 strcpy(buf, input.c_str());
                 ssize_t write_bytes = write(sockfd, (name + buf).c_str(), sizeof(buf) + name.size());
                 bzero(buf, sizeof(buf));
                 if (write_bytes == -1 && errno!= EAGAIN && errno!= EWOULDBLOCK) {
-                    // 如果写操作返回 -1且不是因为非阻塞暂时不可写的情况，视为真正的写错误进行处理
                     errif(true, "write error");
                 }
             }
         }
-
-        // 这里可以添加适当的延时，比如使用usleep(10000); 让程序休眠10毫秒，避免过于频繁地循环检查读写状态消耗过多CPU资源
     }
 
     return 0;

@@ -1,3 +1,4 @@
+// MysqlManager.cpp
 #include "include/MysqlManager.h"
 
 MySQLManager::MySQLManager() : mysql_conn(nullptr), host("localhost"), user("root"), password("123456"), database("ChatRoomDB") {

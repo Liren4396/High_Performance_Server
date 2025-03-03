@@ -1,9 +1,12 @@
+// Epoll.cpp
 #include "include/Epoll.h"
 #include "include/Channel.h"
 #include "include/Util.h"
-
+#include "include/Config.h"
 void Epoll::updateChannel(Channel* channel) {
     int fd = channel->getFd();
+    g_qps_counter++;
+    std::cout << "新的" << fd << std::endl;
     struct epoll_event ev;
     bzero(&ev, sizeof(ev));
     ev.data.ptr = channel;
@@ -13,7 +16,10 @@ void Epoll::updateChannel(Channel* channel) {
         errif(epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) == -1, "epoll add error");
         channel->setInEpoll();
     } else {
-        errif(epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev) == -1, "epoll modify error");
+        bool eventsChanged = (channel->getEvents()!= (ev.events & ~EPOLLET));  // 简单对比事件是否变化，可根据实际完善判断逻辑
+        if (eventsChanged) {
+            errif(epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev) == -1, "epoll modify error");
+        }
     }
 }
 

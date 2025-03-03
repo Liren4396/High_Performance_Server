@@ -1,9 +1,11 @@
+//Acceptor.h
 #include <functional>
 #include <mysql/mysql.h>
 #include <string>
 #include <chrono>
 #include <ctime>
-
+#include <memory>
+#include <unistd.h>
 class EventLoop;
 class Socket;
 class Channel;
@@ -15,6 +17,7 @@ public:
     void acceptConnection();
     void setNewConnectionCallback(std::function<void(Socket*)> _function);
     void insertToDB(int fd, std::string ip, std::time_t timestamp);
+    void handle_request(int client_socket);
 private:
     EventLoop *loop;
     Socket *sock;

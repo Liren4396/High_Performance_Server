@@ -1,3 +1,4 @@
+// Server.cpp
 #include <iostream>
 #include <string.h>
 #include <unistd.h>
@@ -10,10 +11,12 @@
 #include "include/Socket.h"
 #include "include/Channel.h"
 #include "include/EventLoop.h"
+#include "include/Config.h"
 #include "include/Server.h"
 #include "include/Acceptor.h"
 #include "include/Connection.h"
 #include "include/ThreadPool.h"
+
 
 Server::Server(EventLoop* loop): mainReactor(loop), acceptor(nullptr) {
     acceptor = new Acceptor(mainReactor);

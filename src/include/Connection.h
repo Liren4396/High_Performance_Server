@@ -1,3 +1,4 @@
+// Connection.h
 #include <functional>
 #include <string>
 #include <mysql/mysql.h>
