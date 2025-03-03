@@ -43,3 +43,4 @@ CREATE TABLE current_visitor (
     login_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ip char(15) NOT NULL
 );
+

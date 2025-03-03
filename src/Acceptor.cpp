@@ -35,6 +35,7 @@ void Acceptor::insertToDB(int fd, std::string ip, std::time_t timestamp) {
     struct tm* timeinfo = localtime(&timestamp);
     strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
     sprintf(sql, "INSERT INTO current_visitor (login_time, fd, name, ip) VALUES ('%s', '%d', '', '%s')", buffer, fd, ip.c_str());
+
     MYSQL* mysql_conn = MySQLManager::getInstance().getConnection();
     if (mysql_conn != NULL) {
         if (mysql_query(mysql_conn, sql)) {
