@@ -3,7 +3,7 @@
 #include "include/Socket.h"
 #include "include/Channel.h"
 #include "include/Server.h"
-#include "include/Buffer.h"
+#include "include/BufferPool.h"
 #include "include/Util.h"
 #include "include/Manager.h"
 #include "include/MysqlManager.h"
@@ -41,7 +41,7 @@ Connection::Connection(EventLoop* _loop, Socket* _sock) : loop(_loop), sock(_soc
     } else {
         std::cerr << "Invalid Socket or EventLoop for new connection" << std::endl;
     }
-    readBuffer = new Buffer();
+    readBuffer = BufferPool::getInstance().getBuffer();
     //mysql_conn = MySQLManager::getInstance().getConnection();
     //if (mysql_conn == NULL) {
     //    std::cerr << "Failed to get MySQL connection in Connection" << std::endl;
@@ -58,7 +58,7 @@ Connection::~Connection() {
         delete sock;
     }
     if (readBuffer!= nullptr) {
-        delete readBuffer;
+        BufferPool::getInstance().returnBuffer(readBuffer);
     }
 }
 

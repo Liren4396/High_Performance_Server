@@ -2,6 +2,7 @@
 #include <functional>
 #include <string>
 #include <mysql/mysql.h>
+#include <memory>
 #include <chrono>
 #include <ctime>
 class Buffer;
@@ -28,6 +29,6 @@ private:
     Channel* channel;
     std::function<void(int)> deleteConnectionCallback;
     std::string *inBuffer;
-    Buffer *readBuffer;
+    std::shared_ptr<Buffer> readBuffer;
     MYSQL* mysql_conn;
 };

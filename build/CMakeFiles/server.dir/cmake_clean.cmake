@@ -5,6 +5,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/server.dir/src/Acceptor.cpp.o.d"
   "CMakeFiles/server.dir/src/Buffer.cpp.o"
   "CMakeFiles/server.dir/src/Buffer.cpp.o.d"
+  "CMakeFiles/server.dir/src/BufferPool.cpp.o"
+  "CMakeFiles/server.dir/src/BufferPool.cpp.o.d"
   "CMakeFiles/server.dir/src/Channel.cpp.o"
   "CMakeFiles/server.dir/src/Channel.cpp.o.d"
   "CMakeFiles/server.dir/src/Config.cpp.o"

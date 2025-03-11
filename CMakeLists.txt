@@ -24,6 +24,7 @@ set(SOURCES_SERVER
     src/EventLoop.cpp
     src/Acceptor.cpp
     src/Connection.cpp
+    src/BufferPool.cpp
 )
 
 set(SOURCES_CLIENT
@@ -42,6 +43,7 @@ set(SOURCES_CLIENT
     src/EventLoop.cpp
     src/Acceptor.cpp
     src/Connection.cpp
+    src/BufferPool.cpp
 )
 
 add_executable(client ${SOURCES_CLIENT})

@@ -11,6 +11,7 @@ set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/home/dlr/Downloads/High_Performance_Server/client.cpp" "CMakeFiles/client.dir/client.cpp.o" "gcc" "CMakeFiles/client.dir/client.cpp.o.d"
   "/home/dlr/Downloads/High_Performance_Server/src/Acceptor.cpp" "CMakeFiles/client.dir/src/Acceptor.cpp.o" "gcc" "CMakeFiles/client.dir/src/Acceptor.cpp.o.d"
   "/home/dlr/Downloads/High_Performance_Server/src/Buffer.cpp" "CMakeFiles/client.dir/src/Buffer.cpp.o" "gcc" "CMakeFiles/client.dir/src/Buffer.cpp.o.d"
+  "/home/dlr/Downloads/High_Performance_Server/src/BufferPool.cpp" "CMakeFiles/client.dir/src/BufferPool.cpp.o" "gcc" "CMakeFiles/client.dir/src/BufferPool.cpp.o.d"
   "/home/dlr/Downloads/High_Performance_Server/src/Channel.cpp" "CMakeFiles/client.dir/src/Channel.cpp.o" "gcc" "CMakeFiles/client.dir/src/Channel.cpp.o.d"
   "/home/dlr/Downloads/High_Performance_Server/src/Config.cpp" "CMakeFiles/client.dir/src/Config.cpp.o" "gcc" "CMakeFiles/client.dir/src/Config.cpp.o.d"
   "/home/dlr/Downloads/High_Performance_Server/src/Connection.cpp" "CMakeFiles/client.dir/src/Connection.cpp.o" "gcc" "CMakeFiles/client.dir/src/Connection.cpp.o.d"
