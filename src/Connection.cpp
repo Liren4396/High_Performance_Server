@@ -1,6 +1,7 @@
 // Connection.cpp
 #include "include/Connection.h"
 #include "include/Socket.h"
+#include "include/EventLoop.h"
 #include "include/Channel.h"
 #include "include/Server.h"
 #include "include/BufferPool.h"
@@ -25,37 +26,32 @@ void executeSql(MYSQL* conn, const char* sql) {
 
 Connection::Connection(EventLoop* _loop, Socket* _sock) : loop(_loop), sock(_sock), channel(nullptr) {
     if (sock!= nullptr && sock->getFd() >= 0 && _loop!= nullptr) {
-        channel = new Channel(loop, sock->getFd());
-        if (channel!= nullptr) {
-            channel->enableReading();
-            channel->useET();
-            std::function<void()> cb = std::bind(&Connection::echo, this, sock->getFd());
-            channel->SetReadCallback(cb);
-        } else {
-            std::cerr << "Failed to create Channel for the new connection" << std::endl;
-            // 可以在这里添加合适的错误处理逻辑，比如关闭Socket等资源，避免资源泄漏
-            if (sock!= nullptr) {
-                sock->~Socket();
+        // 将 Channel 的创建与注册投递到所属 EventLoop 线程执行
+        loop->runInLoop([this]() {
+            channel = new Channel(loop, sock->getFd());
+            if (channel!= nullptr) {
+                std::function<void()> cb = std::bind(&Connection::echo, this, sock->getFd());
+                channel->SetReadCallback(cb);
+                channel->useET();
+                channel->enableReading();
+            } else {
+                std::cerr << "Failed to create Channel for the new connection" << std::endl;
             }
-        }
+        });
     } else {
         std::cerr << "Invalid Socket or EventLoop for new connection" << std::endl;
     }
     readBuffer = BufferPool::getInstance().getBuffer();
-    //mysql_conn = MySQLManager::getInstance().getConnection();
-    //if (mysql_conn == NULL) {
-    //    std::cerr << "Failed to get MySQL connection in Connection" << std::endl;
-    //}
 }
 
 Connection::~Connection() {
     if (channel!= nullptr) {
-        channel->~Channel();
-        delete channel;
+        delete channel;  // 仅 delete，不显式调用析构
+        channel = nullptr;
     }
     if (sock!= nullptr) {
-        sock->~Socket();
-        delete sock;
+        delete sock;     // 仅 delete，不显式调用析构
+        sock = nullptr;
     }
     if (readBuffer!= nullptr) {
         BufferPool::getInstance().returnBuffer(readBuffer);
@@ -63,58 +59,49 @@ Connection::~Connection() {
 }
 
 void Connection::echo(int sockfd) {
-    char buf[1024];
-    int flag = 1;
+    char buf[4096];
     while (true) {
-        memset(&buf, 0, sizeof(buf));
         ssize_t read_bytes = read(sockfd, buf, sizeof(buf));
-        if (buf[0] == 25) continue;
         if (read_bytes > 0) {
             size_t start = 0;
-            for (size_t i = 0; i < read_bytes; ++i) {
-                // if (buf[i] == '\0') break;
-                //if (buf[i] == 25) return;
+            for (ssize_t i = 0; i < read_bytes; ++i) {
                 if (buf[i] == '\3') {
-                    // 提取从start到i位置（不包含i，因为i位置是'\3'分隔符）的消息内容
                     std::string message(buf, i);
                     readBuffer->setName(message);
-                    //updateNameInDB(sockfd, message);
-                    // 处理完这条消息后，更新start位置，准备查找下一个消息
                     start = i + 1;
                     break;
                 }
             }
-            readBuffer->append(buf+start, read_bytes);
-            //if (flag == 1) {
-            //    insertToHistoryDB(readBuffer->getName(), readBuffer->getBuffer());
-            //    flag = 0;
-           // }
-        } else if (read_bytes == -1 && errno == EINTR) {
-            std::cout << "continue reading" << std::endl;
-            break;
-        } else if (read_bytes == -1 && ((errno == EAGAIN) || (errno == EWOULDBLOCK))) {
-            std::cout << "message from " << readBuffer->getName() << ": " << readBuffer->getBuffer() << std::endl;
-            //errif(write(sockfd, readBuffer->c_str(), readBuffer->size()) == -1, "socket write error");
-            std::vector<int> list = Manager::getInstance().getFds();
-            int if_recorded_inDB = 0;
-            for (int fd : list) {
-                if (fd != sockfd) {
-                    send(fd, readBuffer->getName());
-                }
+            if (start < static_cast<size_t>(read_bytes)) {
+                readBuffer->append(buf + start, read_bytes - start);
             }
-            readBuffer->clear();
-            break;
-        } else if (read_bytes == 0) {
+            // 继续循环直到读到 EAGAIN
+            continue;
+        }
+        if (read_bytes == 0) {
             std::cout << "client" << sockfd << " disconnected" << std::endl;
-            
-            //deleteCurrentVisitorFromDB(sockfd);
             Manager::getInstance().remove(sockfd);
             deleteConnectionCallback(sockfd);
-            break;
-        } else {
-            std::cout << "Connection reset by peer" << std::endl;
-            deleteConnectionCallback(sockfd);          //会有bug，注释后单线程无bug
-            break;
+            return;
+        }
+        if (read_bytes == -1) {
+            if (errno == EINTR) {
+                continue;
+            }
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                std::cout << "message from " << readBuffer->getName() << ": " << readBuffer->getBuffer() << std::endl;
+                std::vector<int> list = Manager::getInstance().getFds();
+                for (int fd : list) {
+                    if (fd != sockfd) {
+                        send(fd, readBuffer->getName());
+                    }
+                }
+                readBuffer->clear();
+                return;
+            }
+            std::cout << "Connection error on read, errno=" << errno << std::endl;
+            deleteConnectionCallback(sockfd);
+            return;
         }
     }
 }

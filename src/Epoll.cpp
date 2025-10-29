@@ -6,18 +6,21 @@
 void Epoll::updateChannel(Channel* channel) {
     int fd = channel->getFd();
     g_qps_counter++;
-    std::cout << "新的" << fd << std::endl;
     struct epoll_event ev;
     bzero(&ev, sizeof(ev));
     ev.data.ptr = channel;
     ev.events = channel->getEvents();
 
     if (!channel->getInEpoll()) {
+        // 仅在新增时打印
+        // std::cout << "[ADD] fd=" << fd << " events=" << ev.events << std::endl;
         errif(epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) == -1, "epoll add error");
         channel->setInEpoll();
     } else {
         bool eventsChanged = (channel->getEvents()!= (ev.events & ~EPOLLET));  // 简单对比事件是否变化，可根据实际完善判断逻辑
         if (eventsChanged) {
+            // 可选：仅在修改时打印
+            // std::cout << "[MOD] fd=" << fd << " events=" << ev.events << std::endl;
             errif(epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev) == -1, "epoll modify error");
         }
     }

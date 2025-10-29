@@ -9,12 +9,7 @@
 Channel::Channel(EventLoop* _loop, int fd1)
     :loop(_loop), fd(fd1), events(0), revents(0), inEpoll(false) {}
 
-Channel::~Channel() {
-    if (fd != -1) {
-        close(fd);
-        fd = -1;
-    }
-}
+Channel::~Channel() {}
 
 void Channel::handleEvent() {
   if (revents & (EPOLLIN | EPOLLPRI)) {
