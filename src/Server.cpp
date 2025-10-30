@@ -16,6 +16,7 @@
 #include "include/Acceptor.h"
 #include "include/Connection.h"
 #include "include/ThreadPool.h"
+#include "include/Manager.h"
 
 
 Server::Server(EventLoop* loop): mainReactor(loop), acceptor(nullptr) {
@@ -41,23 +42,40 @@ Server::~Server() {
 }
 
 void Server::newConnection(Socket *serv_sock) {
-    std::lock_guard<std::mutex> guard(mutex_);
-    if (serv_sock->getFd() != -1) {
-        int random = serv_sock->getFd() % subReactors.size();
-        Connection *conn = new Connection(subReactors[random], serv_sock);
+    if (serv_sock->getFd() == -1) return;
+    
+    int fd = serv_sock->getFd();
+    int random = fd % subReactors.size();
+    EventLoop* subLoop = subReactors[random];
+    
+    // 优化：将Connection的创建投递到subReactor线程执行
+    // 这样Channel的注册就不需要跨线程，减少锁竞争和系统调用
+    subLoop->runInLoop([this, serv_sock, fd, subLoop]() {
+        Connection *conn = new Connection(subLoop, serv_sock);
         std::function<void(int)> cb = std::bind(&Server::deleteConnection, this, std::placeholders::_1);
         conn->setDeleteConnectionCallback(cb);
-        connections[serv_sock->getFd()] = conn;
         
-    }
+        // 在subReactor线程中注册
+        {
+            std::lock_guard<std::mutex> guard(mutex_);
+            connections[fd] = conn;
+        }
+        Manager::getInstance().append(fd, conn);
+    });
 }
 
 void Server::deleteConnection(int sock) {
-    std::lock_guard<std::mutex> guard(mutex_);
-    auto it = connections.find(sock);
-    if (it != connections.end()) {
-        Connection *conn = connections[sock];
-        connections.erase(sock);
+    Connection *conn = nullptr;
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        auto it = connections.find(sock);
+        if (it != connections.end()) {
+            conn = it->second;
+            connections.erase(sock);
+        }
+    }
+    // 在锁外删除Connection，避免删除时的阻塞操作影响其他连接
+    if (conn != nullptr) {
         delete conn;
     }
 }

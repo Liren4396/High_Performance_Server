@@ -18,11 +18,13 @@ public:
     void send(int sockfd, std::string name);
     
     void Read();
-    void Write();
+    void Write();  // 处理EPOLLOUT事件，继续发送写缓冲区中的数据
     void deleteCurrentVisitorFromDB(int fd);
     void updateNameInDB(int sockfd, const std::string& name);
     void insertToVisitorDB(int fd);
     void insertToHistoryDB(const std::string& name, const std::string& sentence);
+    // 跨线程安全发送：将写操作投递到所属 EventLoop 执行
+    void postSend(const std::string& name, const std::string& payload);
 private:
     EventLoop* loop;
     Socket* sock;
@@ -30,5 +32,6 @@ private:
     std::function<void(int)> deleteConnectionCallback;
     std::string *inBuffer;
     std::shared_ptr<Buffer> readBuffer;
+    std::shared_ptr<Buffer> writeBuffer;  // 写缓冲区
     MYSQL* mysql_conn;
 };

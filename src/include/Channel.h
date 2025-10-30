@@ -10,6 +10,7 @@ public:
 
     void handleEvent();
     void enableReading();
+    void enableWriting();
 
     int getFd();
 
@@ -23,6 +24,7 @@ public:
 
     void setRevents(uint32_t r);
     void SetReadCallback(std::function<void()> const &callback);
+    void SetWriteCallback(std::function<void()> const &callback);
 private:
     EventLoop* loop;
     int fd;

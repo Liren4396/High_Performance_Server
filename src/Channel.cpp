@@ -25,6 +25,11 @@ void Channel::enableReading() {
     loop->updateChannel(this);
 }
 
+void Channel::enableWriting() {
+    events |= EPOLLOUT | EPOLLET;
+    loop->updateChannel(this);
+}
+
 int Channel::getFd() {
     return fd;
 }
@@ -52,3 +57,4 @@ void Channel::setRevents(uint32_t r) {
     revents = r;
 }
 void Channel::SetReadCallback(std::function<void()> const &callback) { read_callback_ = callback; }
+void Channel::SetWriteCallback(std::function<void()> const &callback) { write_callback_ = callback; }

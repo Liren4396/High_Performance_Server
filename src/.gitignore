@@ -1,0 +1,20 @@
+# See README for details
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.o
+*.a
+server
+client
+benchmark
+.venv/
+__pycache__/
+*.log
+server.pid
+ws_proxy.pid
+web_server.pid
+.DS_Store
+.idea/
+.vscode/

@@ -14,6 +14,7 @@
 #include <iostream>
 #include <vector>
 #include <mysql/mysql.h>
+#include <cerrno>
 
 #define READ_BUFFER 1024
 
@@ -26,22 +27,40 @@ void executeSql(MYSQL* conn, const char* sql) {
 
 Connection::Connection(EventLoop* _loop, Socket* _sock) : loop(_loop), sock(_sock), channel(nullptr) {
     if (sock!= nullptr && sock->getFd() >= 0 && _loop!= nullptr) {
-        // 将 Channel 的创建与注册投递到所属 EventLoop 线程执行
-        loop->runInLoop([this]() {
+        // 优化：如果已经在所属EventLoop线程，直接创建Channel；否则投递
+        // 由于Server已经确保在subReactor线程创建Connection，这里通常直接执行
+        if (loop->isInLoopThread()) {
+            // 已经在所属线程，直接创建（无锁、无系统调用）
             channel = new Channel(loop, sock->getFd());
             if (channel!= nullptr) {
-                std::function<void()> cb = std::bind(&Connection::echo, this, sock->getFd());
-                channel->SetReadCallback(cb);
+                std::function<void()> readCb = std::bind(&Connection::echo, this, sock->getFd());
+                channel->SetReadCallback(readCb);
+                std::function<void()> writeCb = std::bind(&Connection::Write, this);
+                channel->SetWriteCallback(writeCb);
                 channel->useET();
                 channel->enableReading();
-            } else {
-                std::cerr << "Failed to create Channel for the new connection" << std::endl;
             }
-        });
+        } else {
+            // 不在所属线程（这种情况应该很少），投递执行
+            loop->runInLoop([this]() {
+                channel = new Channel(loop, sock->getFd());
+                if (channel!= nullptr) {
+                    std::function<void()> readCb = std::bind(&Connection::echo, this, sock->getFd());
+                    channel->SetReadCallback(readCb);
+                    std::function<void()> writeCb = std::bind(&Connection::Write, this);
+                    channel->SetWriteCallback(writeCb);
+                    channel->useET();
+                    channel->enableReading();
+                } else {
+                    std::cerr << "Failed to create Channel for the new connection" << std::endl;
+                }
+            });
+        }
     } else {
         std::cerr << "Invalid Socket or EventLoop for new connection" << std::endl;
     }
     readBuffer = BufferPool::getInstance().getBuffer();
+    writeBuffer = BufferPool::getInstance().getBuffer();
 }
 
 Connection::~Connection() {
@@ -55,6 +74,9 @@ Connection::~Connection() {
     }
     if (readBuffer!= nullptr) {
         BufferPool::getInstance().returnBuffer(readBuffer);
+    }
+    if (writeBuffer!= nullptr) {
+        BufferPool::getInstance().returnBuffer(writeBuffer);
     }
 }
 
@@ -89,17 +111,21 @@ void Connection::echo(int sockfd) {
                 continue;
             }
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                std::cout << "message from " << readBuffer->getName() << ": " << readBuffer->getBuffer() << std::endl;
-                std::vector<int> list = Manager::getInstance().getFds();
-                for (int fd : list) {
-                    if (fd != sockfd) {
-                        send(fd, readBuffer->getName());
-                    }
-                }
+            std::cout << "message from " << readBuffer->getName() << ": " << readBuffer->getBuffer() << std::endl;
+            // 使用高效的广播接口：一次加锁完成所有操作
+            Manager::getInstance().broadcast(sockfd, [this](Connection* peer) {
+                peer->postSend(readBuffer->getName(), readBuffer->getBuffer());
+            });
                 readBuffer->clear();
                 return;
             }
-            std::cout << "Connection error on read, errno=" << errno << std::endl;
+            // ECONNRESET(104) 是正常的，表示连接被重置（客户端关闭）
+            if (errno == ECONNRESET || errno == 104) {
+                std::cout << "client" << sockfd << " disconnected (connection reset)" << std::endl;
+            } else {
+                std::cerr << "Connection error on read, errno=" << errno << " (" << strerror(errno) << ")" << std::endl;
+            }
+            Manager::getInstance().remove(sockfd);
             deleteConnectionCallback(sockfd);
             return;
         }
@@ -107,49 +133,40 @@ void Connection::echo(int sockfd) {
 }
 
 void Connection::insertToHistoryDB(const std::string& name, const std::string& sentence) {
-    if (mysql_conn!= NULL) {
-        char sql[256];
-        sprintf(sql, "INSERT INTO history (sentence, name) VALUES ('%s', '%s')", sentence.c_str(), name.c_str());
-        if (mysql_query(mysql_conn, sql)) {
-            std::cerr << "mysql_query() failed: " << mysql_error(mysql_conn) << std::endl;
-            return;
-        }
+    // 转义用户输入，防止SQL注入
+    std::string escaped_name = MySQLManager::getInstance().escapeString(name);
+    std::string escaped_sentence = MySQLManager::getInstance().escapeString(sentence);
+    
+    char sql[512];
+    snprintf(sql, sizeof(sql), "INSERT INTO history (sentence, name) VALUES ('%s', '%s')", 
+             escaped_sentence.c_str(), escaped_name.c_str());
+    
+    // 使用异步队列，避免阻塞 IO 线程
+    if (!MySQLManager::getInstance().enqueueSql(sql)) {
+        std::cerr << "Failed to enqueue SQL (queue full): " << sql << std::endl;
     }
 }
 
 void Connection::updateNameInDB(int sockfd, const std::string& name) {
-    if (mysql_conn!= NULL) {
-        char selectSql[256];
-        sprintf(selectSql, "SELECT name FROM current_visitor WHERE fd = %d", sockfd);
-        if (mysql_query(mysql_conn, selectSql)) {
-            std::cerr << "mysql_query() failed in select for name: " << mysql_error(mysql_conn) << std::endl;
-            return;
-        }
-
-        MYSQL_RES* result = mysql_store_result(mysql_conn);
-        if (result == NULL) {
-            std::cerr << "mysql_store_result() failed: " << mysql_error(mysql_conn) << std::endl;
-            return;
-        }
-
-        MYSQL_ROW row = mysql_fetch_row(result);
-        if (row!= NULL) {
-            std::string currentName = row[0];
-            if (currentName.empty()) {
-                // 如果当前名字为空字符串，构造UPDATE语句更新名字
-                char updateSql[256];
-                sprintf(updateSql, "UPDATE current_visitor SET name = '%s' WHERE fd = %d", name.c_str(), sockfd);
-                if (mysql_query(mysql_conn, updateSql)) {
-                    std::cerr << "mysql_query() failed in update: " << mysql_error(mysql_conn) << std::endl;
-                    return;
-                }
-            }
-        }
-        mysql_free_result(result);
+    // 转义用户输入，防止SQL注入
+    std::string escaped_name = MySQLManager::getInstance().escapeString(name);
+    
+    // 简化：直接更新名字（如果为空则更新），避免 SELECT 查询
+    char updateSql[256];
+    snprintf(updateSql, sizeof(updateSql), "UPDATE current_visitor SET name = '%s' WHERE fd = %d AND (name = '' OR name IS NULL)", 
+             escaped_name.c_str(), sockfd);
+    
+    // 使用异步队列，避免阻塞 IO 线程
+    if (!MySQLManager::getInstance().enqueueSql(updateSql)) {
+        std::cerr << "Failed to enqueue SQL (queue full): " << updateSql << std::endl;
     }
 }
 
 void Connection::insertToVisitorDB(int fd) {
+    // 注意：此函数仍需要同步 SELECT（需要结果），但 INSERT 部分改为异步
+    MYSQL* mysql_conn = MySQLManager::getInstance().getConnection();
+    if (mysql_conn == NULL) return;
+    
     char selectSql[256];
     sprintf(selectSql, "SELECT login_time, name, ip FROM current_visitor WHERE fd = %d", fd);
     if (mysql_query(mysql_conn, selectSql)) {
@@ -163,30 +180,37 @@ void Connection::insertToVisitorDB(int fd) {
     }
     MYSQL_ROW row = mysql_fetch_row(result);
     if (row!= NULL) {
+        // 转义从数据库读取的数据，确保安全（虽然理论上数据库数据是安全的）
+        std::string escaped_login_time = MySQLManager::getInstance().escapeString(row[0] ? row[0] : "");
+        std::string escaped_name = MySQLManager::getInstance().escapeString(row[1] ? row[1] : "");
+        std::string escaped_ip = MySQLManager::getInstance().escapeString(row[2] ? row[2] : "");
+        
         auto now = std::chrono::system_clock::now();
         std::time_t logout_timestamp = std::chrono::system_clock::to_time_t(now);
         char buffer[80];
         struct tm* timeinfo = localtime(&logout_timestamp);
         strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
-        char insertSql[256];
-        sprintf(insertSql, "INSERT INTO visitor (login_time, logout_time, name, ip) VALUES ('%s', '%s', '%s', '%s')",
-                row[0], buffer, row[1], row[2]);
-        if (mysql_query(mysql_conn, insertSql)) {
-            std::cerr << "mysql_query() failed in insert: " << mysql_error(mysql_conn) << std::endl;
-            return;
+        std::string escaped_logout_time = MySQLManager::getInstance().escapeString(buffer);
+        
+        char insertSql[512];
+        snprintf(insertSql, sizeof(insertSql), "INSERT INTO visitor (login_time, logout_time, name, ip) VALUES ('%s', '%s', '%s', '%s')",
+                escaped_login_time.c_str(), escaped_logout_time.c_str(), escaped_name.c_str(), escaped_ip.c_str());
+        
+        // INSERT 使用异步队列，避免阻塞 IO 线程
+        if (!MySQLManager::getInstance().enqueueSql(insertSql)) {
+            std::cerr << "Failed to enqueue SQL (queue full): " << insertSql << std::endl;
         }
     }
+    mysql_free_result(result);
 }
 
 void Connection::deleteCurrentVisitorFromDB(int fd) {
-    if (mysql_conn!= NULL) {
-        //insertToVisitorDB(fd);
-        char sql[256];
-        sprintf(sql, "DELETE FROM current_visitor WHERE fd = %d", fd);
-        if (mysql_query(mysql_conn, sql)) {
-            std::cerr << "mysql_query() failed: " << mysql_error(mysql_conn) << std::endl;
-            return;
-        }
+    char sql[256];
+    sprintf(sql, "DELETE FROM current_visitor WHERE fd = %d", fd);
+    
+    // 使用异步队列，避免阻塞 IO 线程
+    if (!MySQLManager::getInstance().enqueueSql(sql)) {
+        std::cerr << "Failed to enqueue SQL (queue full): " << sql << std::endl;
     }
 }
 
@@ -210,4 +234,85 @@ void Connection::send(int sockfd, std::string name) {
 
 void Connection::setDeleteConnectionCallback(std::function<void(int)> const &_cb) {
     deleteConnectionCallback = _cb;
+}
+
+void Connection::postSend(const std::string& name, const std::string& payload) {
+    // 在所属 EventLoop 线程中执行实际写入，避免跨线程写
+    loop->queueInLoop([this, name, payload]() {
+        if (writeBuffer == nullptr) return;
+        
+        // 构造要发送的数据（优化：预分配容量，减少内存重分配）
+        std::string out;
+        out.reserve(name.size() + 1 + payload.size());  // 预分配空间
+        out.append(name);
+        out.push_back('\3');
+        out.append(payload);
+        
+        // 如果写缓冲区已有数据，直接追加
+        if (writeBuffer->size() > 0) {
+            writeBuffer->append(out.data(), static_cast<int>(out.size()));
+            // 已注册EPOLLOUT，等待可写事件
+            return;
+        }
+        
+        // 尝试直接发送
+        const char* data = out.data();
+        size_t total = out.size();
+        size_t sent = 0;
+        
+        while (sent < total) {
+            ssize_t n = write(sock->getFd(), data + sent, total - sent);
+            if (n == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // 无法继续写，放入缓冲区并注册EPOLLOUT
+                    writeBuffer->append(out.data() + sent, static_cast<int>(total - sent));
+                    if (channel != nullptr) {
+                        std::function<void()> writeCb = std::bind(&Connection::Write, this);
+                        channel->SetWriteCallback(writeCb);
+                        channel->enableWriting();
+                    }
+                    return;
+                }
+                // 其他错误，关闭连接
+                deleteConnectionCallback(sock->getFd());
+                return;
+            }
+            sent += static_cast<size_t>(n);
+        }
+        // 全部发送完成
+    });
+}
+
+void Connection::Write() {
+    if (writeBuffer == nullptr || writeBuffer->size() == 0) {
+        // 没有数据要写，应该取消EPOLLOUT，但保留EPOLLIN
+        // 简化处理：后续可以优化事件管理
+        return;
+    }
+    
+    std::string data = writeBuffer->getBuffer();  // 获取副本
+    size_t total = data.size();
+    size_t sent = 0;
+    
+    while (sent < total) {
+        ssize_t n = write(sock->getFd(), data.data() + sent, total - sent);
+        if (n == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // 仍然无法写，保留剩余数据，保持EPOLLOUT注册
+                if (sent > 0) {
+                    writeBuffer->SetBuf(data.substr(sent));  // 保留未发送部分
+                }
+                return;
+            }
+            // 其他错误，关闭连接
+            deleteConnectionCallback(sock->getFd());
+            return;
+        }
+        sent += static_cast<size_t>(n);
+    }
+    
+    // 全部发送完成，清空缓冲区
+    writeBuffer->clear();
+    // 注意：这里应该只取消EPOLLOUT，保留EPOLLIN
+    // 简化处理：下次发送时会重新注册EPOLLOUT
 }

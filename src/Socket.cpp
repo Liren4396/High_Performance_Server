@@ -2,6 +2,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/socket.h>
+#include <cstring>
+#include <iostream>
 
 #include "include/Socket.h"
 #include "include/InetAddress.h"
@@ -41,21 +43,44 @@ int Socket::saccept(InetAddress* InetAddr) {
     struct sockaddr_in addr = InetAddr->getSockAddress();
     socklen_t addr_len = sizeof(addr);
     if (fcntl(sockfd, F_GETFL) & O_NONBLOCK) {
+        // 非阻塞模式：循环accept直到成功或遇到非EAGAIN错误
         while (true) {
             clnt_sockfd = accept(sockfd, (sockaddr *)&addr, &addr_len);
-            if (clnt_sockfd == -1 && ((errno == EAGAIN) || (errno == EWOULDBLOCK))) {
-                // printf("no connection yet\n");
-                continue;
-            }
             if (clnt_sockfd == -1) {
-                errif(true, "socket accept error");
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // 没有更多连接，返回-1表示暂时没有连接
+                    return -1;
+                } else if (errno == EINTR) {
+                    // 被信号中断，继续重试
+                    continue;
+                } else if (errno == EMFILE || errno == ENFILE) {
+                    // 文件描述符耗尽，记录错误但返回-1，让调用者处理
+                    std::cerr << "accept failed: too many file descriptors (errno=" << errno << ")" << std::endl;
+                    return -1;
+                } else if (errno == ECONNABORTED) {
+                    // 连接被中止，继续尝试下一个连接
+                    continue;
+                } else {
+                    // 其他错误，记录但返回-1
+                    std::cerr << "accept failed: " << strerror(errno) << " (errno=" << errno << ")" << std::endl;
+                    return -1;
+                }
             } else {
+                // accept成功
                 break;
             }
         }
     } else {
+        // 阻塞模式
         clnt_sockfd = accept(sockfd, (sockaddr *)&addr, &addr_len);
-        errif(clnt_sockfd == -1, "accept socket error");
+        if (clnt_sockfd == -1) {
+            if (errno == EMFILE || errno == ENFILE) {
+                std::cerr << "accept failed: too many file descriptors (errno=" << errno << ")" << std::endl;
+            } else if (errno != EINTR) {
+                std::cerr << "accept failed: " << strerror(errno) << " (errno=" << errno << ")" << std::endl;
+            }
+            return -1;
+        }
     }
     InetAddr->setInetAddr(addr);
     return clnt_sockfd;
