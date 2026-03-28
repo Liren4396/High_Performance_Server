@@ -27,6 +27,9 @@ Socket::Socket(int fd) : sockfd(fd) {
 
 void Socket::sbind(InetAddress* inetAddress) {
     struct sockaddr_in serv_addr = inetAddress->getSockAddress();
+    int opt = 1;
+    errif(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1,
+          "socket setsockopt SO_REUSEADDR error");
     errif(bind(sockfd, (sockaddr*)&serv_addr, sizeof(serv_addr)) == -1, "socket bind error");
 }
 

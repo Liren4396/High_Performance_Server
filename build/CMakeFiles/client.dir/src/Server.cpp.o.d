@@ -250,4 +250,8 @@ CMakeFiles/client.dir/src/Server.cpp.o: \
  /usr/include/c++/13/bits/stl_deque.h /usr/include/c++/13/bits/deque.tcc \
  /usr/include/c++/13/bits/stl_queue.h \
  /usr/include/c++/13/condition_variable /usr/include/c++/13/future \
- /usr/include/c++/13/bits/atomic_futex.h
+ /usr/include/c++/13/bits/atomic_futex.h \
+ /root/High_Performance_Server/src/include/Manager.h \
+ /usr/include/c++/13/algorithm \
+ /usr/include/c++/13/pstl/glue_algorithm_defs.h \
+ /usr/include/c++/13/shared_mutex

@@ -1,0 +1,2 @@
+/root/High_Performance_Server/tools/ws_proxy.py:5: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+  from websockets.server import WebSocketServerProtocol

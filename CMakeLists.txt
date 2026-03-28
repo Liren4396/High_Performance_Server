@@ -61,7 +61,15 @@ else()
     target_link_libraries(server pthread)
 endif()
 
+set(SOURCES_BENCHMARK
+    benchmark.cpp
+    src/Config.cpp
+)
+
+add_executable(benchmark ${SOURCES_BENCHMARK})
+target_link_libraries(benchmark pthread)
+
 add_custom_target(custom_clean
-    COMMAND rm -rf client server
+    COMMAND rm -rf client server benchmark
     COMMENT "Cleaning up the build directory"
 )

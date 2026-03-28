@@ -5,18 +5,99 @@
 #include "include/Channel.h"
 #include "include/Server.h"
 #include "include/BufferPool.h"
-#include "include/Util.h"
 #include "include/Manager.h"
 #include "include/MysqlManager.h"
 
 #include <unistd.h>
 #include <string.h>
 #include <iostream>
-#include <vector>
 #include <mysql/mysql.h>
 #include <cerrno>
+#include <fstream>
+#include <sstream>
 
 #define READ_BUFFER 1024
+
+namespace {
+bool looksLikeHttpRequest(const std::string& data) {
+    return data.rfind("GET ", 0) == 0 ||
+           data.rfind("POST ", 0) == 0 ||
+           data.rfind("HEAD ", 0) == 0 ||
+           data.rfind("PUT ", 0) == 0 ||
+           data.rfind("DELETE ", 0) == 0 ||
+           data.rfind("OPTIONS ", 0) == 0;
+}
+
+bool writeAll(int fd, const std::string& data) {
+    size_t sent = 0;
+    while (sent < data.size()) {
+        ssize_t n = write(fd, data.data() + sent, data.size() - sent);
+        if (n > 0) {
+            sent += static_cast<size_t>(n);
+            continue;
+        }
+        if (n == -1 && errno == EINTR) {
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
+
+std::string getHttpMethod(const std::string& req) {
+    size_t first_space = req.find(' ');
+    if (first_space == std::string::npos) return "";
+    return req.substr(0, first_space);
+}
+
+std::string getHttpPath(const std::string& req) {
+    size_t first_space = req.find(' ');
+    if (first_space == std::string::npos) return "/";
+    size_t second_space = req.find(' ', first_space + 1);
+    if (second_space == std::string::npos) return "/";
+    std::string path = req.substr(first_space + 1, second_space - first_space - 1);
+    if (path.empty()) return "/";
+    size_t q = path.find('?');
+    if (q != std::string::npos) path = path.substr(0, q);
+    size_t hash = path.find('#');
+    if (hash != std::string::npos) path = path.substr(0, hash);
+    if (path == "/") return "/index.html";
+    return path;
+}
+
+std::string getContentType(const std::string& path) {
+    if (path.size() >= 5 && path.substr(path.size() - 5) == ".html") return "text/html; charset=utf-8";
+    if (path.size() >= 4 && path.substr(path.size() - 4) == ".css") return "text/css; charset=utf-8";
+    if (path.size() >= 3 && path.substr(path.size() - 3) == ".js") return "application/javascript; charset=utf-8";
+    if (path.size() >= 4 && path.substr(path.size() - 4) == ".png") return "image/png";
+    if (path.size() >= 4 && path.substr(path.size() - 4) == ".jpg") return "image/jpeg";
+    if (path.size() >= 5 && path.substr(path.size() - 5) == ".jpeg") return "image/jpeg";
+    if (path.size() >= 4 && path.substr(path.size() - 4) == ".svg") return "image/svg+xml";
+    return "application/octet-stream";
+}
+
+bool readFileContent(const std::string& full_path, std::string& out) {
+    std::ifstream ifs(full_path, std::ios::binary);
+    if (!ifs.is_open()) return false;
+    std::ostringstream ss;
+    ss << ifs.rdbuf();
+    out = ss.str();
+    return true;
+}
+
+std::string buildHttpResponse(const std::string& status,
+                              const std::string& content_type,
+                              const std::string& body) {
+    return "HTTP/1.1 " + status + "\r\n"
+           "Content-Type: " + content_type + "\r\n"
+           "Connection: close\r\n"
+           "Content-Length: " + std::to_string(body.size()) + "\r\n\r\n" + body;
+}
+
+std::string buildHttpTextResponse(const std::string& status, const std::string& text) {
+    return buildHttpResponse(status, "text/plain; charset=utf-8", text);
+}
+}  // namespace
 
 void executeSql(MYSQL* conn, const char* sql) {
     if (mysql_query(conn, sql)) {
@@ -111,10 +192,50 @@ void Connection::echo(int sockfd) {
                 continue;
             }
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            std::cout << "message from " << readBuffer->getName() << ": " << readBuffer->getBuffer() << std::endl;
+            const std::string payload = readBuffer->getBuffer();
+
+            if (looksLikeHttpRequest(payload)) {
+                const std::string method = getHttpMethod(payload);
+                const std::string path = getHttpPath(payload);
+                std::string response;
+
+                if (method != "GET" && method != "HEAD") {
+                    response = buildHttpTextResponse("405 Method Not Allowed", "Only GET/HEAD is supported.");
+                } else if (path.empty() || path[0] != '/' || path.find("..") != std::string::npos) {
+                    response = buildHttpTextResponse("400 Bad Request", "Invalid request path.");
+                } else {
+                    std::string body;
+                    // 兼容两种启动目录：项目根目录(./web) 和 build 目录(../web)
+                    bool found = readFileContent("web" + path, body) || readFileContent("../web" + path, body);
+                    if (found) {
+                        if (method == "HEAD") {
+                            response = "HTTP/1.1 200 OK\r\n"
+                                       "Content-Type: " + getContentType(path) + "\r\n"
+                                       "Connection: close\r\n"
+                                       "Content-Length: " + std::to_string(body.size()) + "\r\n\r\n";
+                        } else {
+                            response = buildHttpResponse("200 OK", getContentType(path), body);
+                        }
+                    } else {
+                        response = buildHttpTextResponse("404 Not Found", "File not found.");
+                    }
+                }
+
+                writeAll(sockfd, response);
+                Manager::getInstance().remove(sockfd);
+                deleteConnectionCallback(sockfd);
+                return;
+            }
+            // 测试专用
+            std::cout << "message from " << readBuffer->getName() << ": " << payload << std::endl;
+            // 先回发给发送者自己，再广播给其他连接，方便单客户端测试。
+            Connection* self = Manager::getInstance().getConnection(sockfd);
+            if (self != nullptr) {
+                self->postSend(readBuffer->getName(), payload);
+            }
             // 使用高效的广播接口：一次加锁完成所有操作
-            Manager::getInstance().broadcast(sockfd, [this](Connection* peer) {
-                peer->postSend(readBuffer->getName(), readBuffer->getBuffer());
+            Manager::getInstance().broadcast(sockfd, [this, payload](Connection* peer) {
+                peer->postSend(readBuffer->getName(), payload);
             });
                 readBuffer->clear();
                 return;

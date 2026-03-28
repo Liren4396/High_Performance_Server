@@ -68,7 +68,7 @@ include CMakeFiles/custom_clean.dir/progress.make
 
 CMakeFiles/custom_clean:
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/root/High_Performance_Server/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Cleaning up the build directory"
-	rm -rf client server
+	rm -rf client server benchmark
 
 custom_clean: CMakeFiles/custom_clean
 custom_clean: CMakeFiles/custom_clean.dir/build.make

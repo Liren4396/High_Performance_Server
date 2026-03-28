@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chat Web Client</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; padding: 24px; background: #0b1220; color: #e7eaf3; }
+    .card { max-width: 720px; margin: 0 auto; background: #121a2b; border: 1px solid #1f2a44; border-radius: 12px; overflow: hidden; }
+    header { padding: 16px 20px; font-weight: 700; letter-spacing: .2px; background: #0e1627; border-bottom: 1px solid #1f2a44; }
+    .row { display: flex; gap: 8px; padding: 12px 12px; border-bottom: 1px solid #1f2a44; }
+    input, button { height: 38px; border-radius: 10px; border: 1px solid #2b3a5e; background: #0b1220; color: #e7eaf3; padding: 0 12px; }
+    input:focus { outline: none; border-color: #3e63dd; box-shadow: 0 0 0 3px rgba(62,99,221,0.25); }
+    button { background: #3e63dd; border: none; cursor: pointer; padding: 0 14px; }
+    button.secondary { background: #1f2a44; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    #log { padding: 12px; height: 420px; overflow: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #0b1220; }
+    .msg { padding: 6px 8px; border-bottom: 1px dashed #1f2a44; white-space: pre-wrap; word-break: break-word; }
+    footer { padding: 12px; display: flex; gap: 8px; }
+    .hint { margin: 0; padding: 10px 12px; font-size: 13px; color: #9fb1d9; border-bottom: 1px solid #1f2a44; }
+  </style>
+  <script>
+    let ws;
+    function log(msg){
+      const el = document.getElementById('log');
+      const div = document.createElement('div');
+      div.className = 'msg';
+      div.textContent = msg;
+      el.appendChild(div);
+      el.scrollTop = el.scrollHeight;
+    }
+    function setConnected(connected){
+      document.getElementById('connect').disabled = connected;
+      document.getElementById('disconnect').disabled = !connected;
+      document.getElementById('send').disabled = !connected;
+      document.getElementById('name').disabled = connected;
+    }
+    function connect(){
+      const url = document.getElementById('url').value.trim() || 'ws://127.0.0.1:8765';
+      const name = document.getElementById('name').value.trim() || 'WebUser';
+      ws = new WebSocket(url);
+      ws.onopen = () => {
+        setConnected(true);
+        log('[connected] ' + url);
+        // 协议要求：每条消息使用 name + \x03 + payload
+        // 因此不需要单独发送名字
+      };
+      ws.onmessage = (ev) => {
+        let data = typeof ev.data === 'string' ? ev.data : '';
+        // 去除可能的结尾换行
+        if (data.endsWith('\\n')) data = data.slice(0, -1);
+        const sep = '\u0003';
+        const p = data.indexOf(sep);
+        if (p !== -1) {
+          const sender = data.slice(0, p);
+          const msg = data.slice(p + 1);
+          log(`message from ${sender}: ${msg}`);
+        } else {
+          log(data);
+        }
+      };
+      ws.onclose = () => { setConnected(false); log('[closed]'); };
+      ws.onerror = (err) => log('[error] ' + (err?.message || ''));
+    }
+    function disconnect(){ if(ws){ ws.close(); } }
+    function send(){
+      const input = document.getElementById('text');
+      const v = input.value;
+      if(ws && ws.readyState === 1){
+        const name = document.getElementById('name').value.trim() || 'WebUser';
+        const payload = name + '\u0003' + v;
+        ws.send(payload);
+      }
+      input.value = '';
+      input.focus();
+    }
+  </script>
+  </head>
+  <body>
+    <div class="card">
+      <header>High Performance Chat - Web</header>
+      <p class="hint">提示：服务端收到消息后会广播给所有连接客户端（包含发送者），可用多个页面同时测试。</p>
+      <div class="row">
+        <input id="url" style="flex:2" placeholder="ws://127.0.0.1:8765" value="ws://127.0.0.1:8765" />
+        <input id="name" style="flex:1" placeholder="输入用户名" value="WebUser" />
+        <button id="connect" onclick="connect()">连接</button>
+        <button id="disconnect" class="secondary" disabled onclick="disconnect()">断开</button>
+      </div>
+      <div id="log"></div>
+      <footer>
+        <input id="text" style="flex:1" placeholder="输入消息并回车发送" onkeydown="if(event.key==='Enter'){send()}" />
+        <button id="send" disabled onclick="send()">发送</button>
+      </footer>
+    </div>
+  </body>
+  </html>
+
+

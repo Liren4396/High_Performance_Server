@@ -246,4 +246,7 @@ CMakeFiles/client.dir/src/Connection.cpp.o: \
  /root/High_Performance_Server/src/include/Manager.h \
  /usr/include/c++/13/algorithm \
  /usr/include/c++/13/pstl/glue_algorithm_defs.h \
- /root/High_Performance_Server/src/include/MysqlManager.h
+ /usr/include/c++/13/shared_mutex \
+ /root/High_Performance_Server/src/include/MysqlManager.h \
+ /usr/include/c++/13/condition_variable /usr/include/c++/13/deque \
+ /usr/include/c++/13/bits/stl_deque.h /usr/include/c++/13/bits/deque.tcc

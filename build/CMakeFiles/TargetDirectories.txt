@@ -1,5 +1,6 @@
 /root/High_Performance_Server/build/CMakeFiles/client.dir
 /root/High_Performance_Server/build/CMakeFiles/server.dir
+/root/High_Performance_Server/build/CMakeFiles/benchmark.dir
 /root/High_Performance_Server/build/CMakeFiles/custom_clean.dir
 /root/High_Performance_Server/build/CMakeFiles/edit_cache.dir
 /root/High_Performance_Server/build/CMakeFiles/rebuild_cache.dir
